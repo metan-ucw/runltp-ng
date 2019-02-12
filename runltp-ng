@@ -1,0 +1,103 @@
+#!/usr/bin/env perl
+#
+# Linux Test Project test runner
+#
+# Copyright (c) 2017-2018 Cyril Hrubis <chrubis@suse.cz>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+use lib './';
+use log;
+use backend;
+use utils;
+use results;
+
+my $backend_opts = "sh";
+my $help = '';
+my $logname = "log";
+my $sysinfo;
+my $verbose;
+my $list;
+my $run;
+my $exclude;
+my $install;
+
+GetOptions("backend=s" => \$backend_opts,
+           "help" => \$help,
+           "logname=s" => \$logname,
+           "sysinfo" => \$sysinfo,
+           "list" => \$list,
+           "run=s" => \$run,
+           "exclude=s" => \$exclude,
+           "install=s" => \$install,
+           "verbose" => \$verbose)
+or die("Error in argument parsing!\n");
+
+if ($help) {
+	print("Options\n-------\n\n");
+	print("--help             : Prints this help\n\n");
+	print("--logname=name     : Name for all generated logs\n\n");
+	print("--sysinfo          : Print system information\n\n");
+	print("--list             : List test groups\n\n");
+	print("--verbose          : Enables verbose mode\n\n");
+	print("--run=testgroup    : Execute group of tests\n\n");
+	print("--exclude=regex    : Exclude tests from test group\n\n");
+	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
+	print("Backend help\n------------\n\n");
+	print("--backend=sh|...[:param=val]...\n\n");
+	backend::help();
+	exit(0);
+}
+
+log::set_verbosity(1) if ($verbose);
+
+my $backend = backend::new($backend_opts);
+
+if ($sysinfo || $list) {
+	backend::start($backend);
+	if ($sysinfo) {
+		$sysinfo = utils::collect_sysinfo($backend);
+		utils::print_sysinfo($sysinfo);
+	}
+	utils::list_testgroups($backend) if ($list);
+	backend::stop($backend);
+	exit(0);
+}
+
+backend::set_logfile($backend, "$logname.raw");
+backend::start($backend);
+
+if ($install) {
+	utils::install_ltp($backend, $install);
+} else {
+	if (!backend::run_cmd($backend, "! [ -e /opt/ltp ]")) {
+		utils::install_ltp($backend);
+	}
+}
+
+if ($run) {
+	my %results;
+	$results{'sysinfo'} = utils::collect_sysinfo($backend);
+	my ($stats, $test_results) = utils::run_ltp($backend, $run, $exclude);
+	$results{'tests'} = {'stats' => $stats, 'results' => $test_results};
+	results::writelog(\%results, "$logname.json");
+	results::writelog_html(\%results, "$logname.html");
+}
+
+backend::stop($backend);
