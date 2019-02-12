@@ -263,8 +263,10 @@ sub reboot
 	my ($self, $reason) = @_;
 
 	print("$reason, attempting to reboot...\n");
-	backend::reboot($self);
-	setup_ltp_run($self);
+	my $ret = backend::reboot($self);
+	return $ret if ($ret != 0);
+	return -1 if (!setup_ltp_run($self));
+	return 0;
 }
 
 
@@ -295,7 +297,12 @@ sub run_cmds_retry
 		if ($cnt == $args{retries}){
 			die ("Unable to recover SUT");
 		}
-		reboot($self, "Timeout on command: " . $ret[$#ret]->{cmd});
+		my $reboot_msg = "Timeout on command: " . $ret[$#ret]->{cmd};
+		my $reboot_ret = reboot($self, $reboot_msg);
+		if ($reboot_ret != 0){
+			push(@ret, {cmd=>'reboot-sut', ret=>$reboot_ret, log => $reboot_msg});
+			last;
+		}
 	}
 	if ($args{results}){
 		push(@{$args{results}} , @ret);
@@ -377,11 +384,14 @@ sub run_ltp
 		}
 
 		if (!defined($ret)) {
-			reboot($self, 'Machine stopped respoding');
+			last if (reboot($self, 'Machine stopped respoding') != 0);
 		} elsif ($ret) {
 			my $tainted = check_tainted($self);
-			reboot($self, 'Machine stopped respoding') unless defined($tainted);
-			reboot($self, 'Kernel was tained') if ($tainted != $start_tainted);
+                        my $err_msg = defined($tainted) ?
+                            'Kernel was tained' : 'Machine stopped responding';
+			if ($tainted != $start_tainted) {
+				last if(reboot($self, $err_msg) != 0);
+			}
 		}
 	}
 
