@@ -255,7 +255,7 @@ sub check_tainted
 	my ($self) = @_;
 	my $res;
 
-	my ($ret, @log) = backend::run_cmd($self, "printf tainted-; cat /proc/sys/kernel/tainted");
+	my ($ret, @log) = backend::run_cmd($self, "printf tainted-; cat /proc/sys/kernel/tainted", 600);
 
 	return undef if ($ret);
 
@@ -353,6 +353,7 @@ sub run_ltp
 			reboot($self, 'Machine stopped respoding');
 		} elsif ($ret) {
 			my $tainted = check_tainted($self);
+			reboot($self, 'Machine stopped respoding') unless defined($tainted);
 			reboot($self, 'Kernel was tained') if ($tainted != $start_tainted);
 		}
 	}
