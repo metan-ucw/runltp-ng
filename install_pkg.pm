@@ -33,11 +33,18 @@ sub foo_to_pkg
 		'automake' => 'automake',
 		'make' => 'make',
 		'gcc' => 'gcc',
+
 		'libaio-devel-debian' => 'libaio-dev',
 		'libacl-devel-debian' => 'libacl1-dev',
 		'libattr-devel-debian' => 'libattr1-dev',
 		'libcap-devel-debian' => 'libcap-dev',
 		'libnuma-devel-debian' => 'libnuma-dev',
+
+		'libaio-devel-suse' => 'libaio-devel',
+		'libacl-devel-suse' => 'libacl-devel',
+		'libattr-devel-suse' => 'libattr-devel',
+		'libcap-devel-suse' => 'libcap-devel',
+		'libnuma-devel-suse' => 'libnuma-devel',
 	);
 
 	my $pkg = $pkg_map{"$foo-$distro"};
@@ -51,8 +58,10 @@ sub install_pkg
 	my ($self, $foo) = @_;
 	my $distro;
 
-	if (backend::check_cmd($self, 'apt-get > /dev/null 2>&1')) {
-		$distro = "debian"
+	if (backend::run_cmd($self, 'grep -q debian /etc/os-release') == 0) {
+		$distro = "debian";
+	} elsif (backend::run_cmd($self, 'grep -q opensuse /etc/os-release') == 0) {
+		$distro = "suse";
 	} else {
 		print("Unknown distribution!\n");
 		return 1;
@@ -62,6 +71,11 @@ sub install_pkg
 
 	if ($distro eq "debian") {
 		return 1 if (backend::run_cmd($self, "apt-get install -y $pkg"));
+		return 0;
+	}
+
+	if ($distro eq "suse") {
+		return 1 if (backend::run_cmd($self, "zypper --non-interactive in $pkg"));
 		return 0;
 	}
 }
