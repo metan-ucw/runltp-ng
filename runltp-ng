@@ -37,6 +37,7 @@ my $list;
 my $run;
 my $exclude;
 my $install;
+my $cmd;
 
 GetOptions("backend=s" => \$backend_opts,
            "help" => \$help,
@@ -46,6 +47,7 @@ GetOptions("backend=s" => \$backend_opts,
            "run=s" => \$run,
            "exclude=s" => \$exclude,
            "install=s" => \$install,
+	   "cmd=s" => \$cmd,
            "verbose" => \$verbose)
 or die("Error in argument parsing!\n");
 
@@ -59,6 +61,7 @@ if ($help) {
 	print("--run=testgroup    : Execute group of tests\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
+	print("--cmd=cmd          : Execute command\n\n");
 	print("Backend help\n------------\n\n");
 	print("--backend=sh|...[:param=val]...\n\n");
 	backend::help();
@@ -82,6 +85,11 @@ if ($sysinfo || $list) {
 
 backend::set_logfile($backend, "$logname.raw");
 backend::start($backend);
+
+if ($cmd) {
+	my @result = backend::run_cmd($backend, $cmd);
+	print("$_\n") for (@result);
+}
 
 if ($install) {
 	utils::install_ltp($backend, $install);
