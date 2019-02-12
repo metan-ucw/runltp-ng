@@ -27,6 +27,7 @@ use Time::HiRes qw(clock_gettime CLOCK_MONOTONIC);
 
 use log;
 use backend;
+use install_pkg;
 
 sub format_memsize
 {
@@ -167,6 +168,8 @@ sub install_ltp
 {
 	my ($self, $revision) = @_;
 	my $ret;
+
+	install_pkg::install_ltp_pkgs($self);
 
 	if (backend::run_cmd($self, '[ -e /opt/ltp ]') == 0) {
 		backend::run_cmd($self, 'rm -rf /opt/ltp');
