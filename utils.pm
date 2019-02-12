@@ -274,9 +274,11 @@ sub setup_ltp_run
 	my @tests;
 
 	backend::run_cmd($self, "cd /opt/ltp/");
+	backend::run_cmd($self, 'export LTPROOT=$PWD');
+	backend::run_cmd($self, 'export TMPDIR=/tmp');
+	backend::run_cmd($self, 'export PATH=$LTPROOT/testcases/bin:$PATH');
 	@tests = backend::read_file($self, "runtest/$runtest") if defined($runtest);
-	backend::run_cmd($self, "cd testcases/bin");
-	backend::run_cmd($self, "export PATH=\$PATH:\$PWD");
+	backend::run_cmd($self, 'cd $LTPROOT/testcases/bin');
 
 	return \@tests;
 }
