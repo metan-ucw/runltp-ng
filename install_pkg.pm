@@ -25,7 +25,7 @@ use warnings;
 
 sub foo_to_pkg
 {
-	my ($self, $foo, $distro) = @_;
+	my ($foo, $distro) = @_;
 	my %pkg_map = (
 		'git' => 'git',
 		'unzip' => 'unzip',
@@ -57,14 +57,15 @@ sub detect_distro
 {
 	my ($self) = @_;
 
-	if (backend::run_cmd($self, 'grep -q debian /etc/os-release') == 0) {
+	if (utils::run_cmd_retry($self, 'grep -q debian /etc/os-release') == 0) {
 		return "debian";
-	} elsif (backend::run_cmd($self, 'grep -q opensuse /etc/os-release') == 0) {
+	}
+	if (utils::run_cmd_retry($self, 'grep -q opensuse /etc/os-release') == 0) {
 		return "suse";
 	}
 
 	print("Unknown distribution!\n");
-	return undef;
+	return;
 }
 
 sub pkg_to_m32
@@ -78,46 +79,47 @@ sub pkg_to_m32
 
 	return "$pkg_name-32bit" if ($distro eq "suse");
 
-	return undef;
+	return;
 }
 
 sub setup_m32
 {
-	my ($self, $distro) = @_;
+	my ($distro) = @_;
 
 	if ($distro eq "debian") {
-		backend::run_cmd($self, "dpkg --add-architecture i386");
-		backend::run_cmd($self, "apt-get update");
+		return ( "dpkg --add-architecture i386", "apt-get update");
 	}
+	return;
 }
 
 sub install_pkg
 {
-	my ($self, $distro, $foo, $m32) = @_;
+        my ($distro, $foos, $m32) = @_;
 
-	my $pkg = foo_to_pkg($self, $foo, $distro);
+	$foos = [ $foos ] unless (ref($foos) eq 'ARRAY');
 
-	$pkg = pkg_to_m32($self, $distro, $pkg) if ($m32);
+	my @pkgs = map { foo_to_pkg($_, $distro) } @{$foos};
 
-	if ($distro eq "debian") {
-		return 1 if (backend::run_cmd($self, "apt-get install -y $pkg"));
-		return 0;
+	@pkgs = map{ pkg_to_m32($distro, $_)} @pkgs if ($m32);
+
+	if ($distro eq 'debian') {
+		return 'apt-get install -y ' . join(' ', @pkgs);
+
+	} elsif ($distro eq 'suse') {
+		return 'zypper --non-interactive in ' . join(' ', @pkgs);
 	}
-
-	if ($distro eq "suse") {
-		return 1 if (backend::run_cmd($self, "zypper --non-interactive in $pkg"));
-		return 0;
-	}
+	return;
 }
+
 
 sub update_pkg_db
 {
-	my ($self, $distro) = @_;
+	my ($distro) = @_;
 
 	if ($distro eq "debian") {
-		return 1 if backend::run_cmd($self, "apt-get update");
-		return 0;
+		return "apt-get update";
 	}
+	return;
 }
 
 sub install_ltp_pkgs
@@ -127,36 +129,39 @@ sub install_ltp_pkgs
 
 	return unless defined($distro);
 
-	update_pkg_db($self, $distro);
-
 	# Attempt to install required packages
 	my @required_pkgs = ('make', 'autoconf', 'automake', 'gcc');
 
-	install_pkg($self, $distro, $_) foreach (@required_pkgs);
-
 	# We need at least one
-	install_pkg($self, $distro, "git");
-	install_pkg($self, $distro, "unzip");
+        push(@required_pkgs, 'git');
+        push(@required_pkgs, 'unzip');
 
 	# Attempt to install devel libraries
-	my @devel_libs = (
+        my @devel_libs = (
 		'libaio-devel',
 		'libacl-devel',
 		'libattr-devel',
 		'libcap-devel',
 		'libnuma-devel');
+	push(@required_pkgs, @devel_libs);
 
-	install_pkg($self, $distro, $_) foreach (@devel_libs);
-
+        my @cmds = ();
+	push(@cmds, update_pkg_db($distro));
+        push(@cmds, install_pkg($distro,\@required_pkgs));
 
 	if ($m32) {
-		setup_m32($self, $distro);
-
-		foreach ((@devel_libs, "gcc")) {
-			install_pkg($self, $distro, $_, $m32);
-		}
+		push(@cmds, setup_m32($distro));
+		push(@cmds, install_pkg($distro,\@devel_libs, $m32));
+		push(@cmds, install_pkg($distro, 'gcc', $m32));
 	}
 
+	my @results;
+	if (utils::run_cmds_retry($self, \@cmds, results => \@results) != 0){
+		my $last = $results[$#results];
+		printf("Failed command: %s\n  output:\n%s\n",
+			$last->{cmd}, join("\n  ", @{$last->{log}}));
+		return $last->{ret};
+	}
 	return 0;
 }
 
