@@ -130,7 +130,10 @@ sub install_git
 	}
 
 	if ($revision) {
-		backend::run_cmd($self, "git checkout $revision");
+		if (backend::run_cmd($self, "cd ltp && git checkout $revision")) {
+			print("Failed to checkout $revision!\n");
+			return 1;
+		}
 	}
 
 	return 0;
@@ -152,7 +155,7 @@ sub install_zip
 		return 1;
 	}
 
-	if (backend::run_cmd($self, "mv ltp-* ltp")) {
+	if (backend::run_cmd($self, "mv ltp-* ltp && cd ltp")) {
 		printf("Failed to rename archive!\n");
 		return 1;
 	}
@@ -175,11 +178,6 @@ sub install_ltp
 		return 1 if install_git($self, $revision);
 	} else {
 		return 1 if install_zip($self, $revision);
-	}
-
-	if (backend::run_cmd($self, 'cd ltp')) {
-		print("ltp/ directory does not exist!\n");
-		return 1;
 	}
 
 	if (backend::run_cmd($self, 'make autotools')) {
