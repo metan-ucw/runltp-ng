@@ -229,6 +229,32 @@ sub reboot
 	start($self);
 }
 
+sub qemu_read_file
+{
+	my ($self, $path) = @_;
+
+	if (run_cmd($self, "cat \"$path\" > /dev/ttyS1")) {
+		die("Failed to write file to ttyS1");
+	}
+
+	if (run_cmd($self, 'echo "runltp-ng-magic-end-of-file-string" > /dev/ttyS1')) {
+		die("Failed to write to ttyS1");
+	}
+
+	my @lines;
+	my $fh = $self->{'transport'};
+
+	while (1) {
+		my $line = <$fh>;
+		# Strip CR LF
+		$line =~ s/(\x0d|\x0a)//g;
+		last if ($line eq "runltp-ng-magic-end-of-file-string");
+		push(@lines, $line);
+	}
+
+	return @lines;
+}
+
 sub qemu_start
 {
 	my ($self) = @_;
@@ -236,12 +262,26 @@ sub qemu_start
 
 	msg("Starting qemu with: $cmdline\n");
 
+	unlink($self->{'transport_fname'});
+
 	my ($qemu_out, $qemu_in);
 	my $pid = open2($qemu_out, $qemu_in, $cmdline) or die("Fork failed");
 
 	$self->{'pid'} = $pid;
 	$self->{'in_fd'} = $qemu_in;
 	$self->{'out_fd'} = $qemu_out;
+
+	for (my $i = 0; $i < 10; $i++) {
+		if (open(my $fh, '<', $self->{'transport_fname'})) {
+			$self->{'transport'} = $fh;
+			$self->{'read_file'} = \&qemu_read_file;
+			last;
+		}
+		msg("Waiting for '$self->{'transport_fname'}' file to appear\n");
+		sleep(1);
+	}
+
+	die("Can't open transport file") unless defined($self->{'transport'});
 
 	msg("Waiting for qemu to boot the machine\n");
 
@@ -256,6 +296,10 @@ sub qemu_start
 sub qemu_stop
 {
 	my ($self) = @_;
+
+	close($self->{'transport'}) if defined($self->{'transport'});
+
+	unlink($self->{'transport_fname'});
 
 	msg("Stopping qemu pid $self->{'pid'}\n");
 
@@ -325,7 +369,10 @@ my $qemu_params = [
 sub qemu_init
 {
 	my %backend;
+	my $transport_fname = "transport-" . getppid();
+	$backend{'transport_fname'} = $transport_fname;
 	$backend{'qemu_params'} = "-enable-kvm -display none -serial stdio";
+	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
 	$backend{'qemu_system'} = 'x86_64';
 
 	parse_params(\%backend, "qemu", $qemu_params, @_);
@@ -528,6 +575,11 @@ sub check_cmd
 sub read_file
 {
 	my ($self, $path) = @_;
+
+	if (defined($self->{'read_file'})) {
+		return $self->{'read_file'}->($self, $path);
+	}
+
 	my @res = run_cmd($self, "cat $path");
 
 	if ($res[0] != 0) {
