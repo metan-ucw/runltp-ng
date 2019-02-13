@@ -371,7 +371,7 @@ sub qemu_init
 	my %backend;
 	my $transport_fname = "transport-" . getppid();
 	$backend{'transport_fname'} = $transport_fname;
-	$backend{'qemu_params'} = "-enable-kvm -display none -serial stdio";
+	$backend{'qemu_params'} = "-enable-kvm -m 1.5G -smp 2 -display none -serial stdio";
 	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
 	$backend{'qemu_system'} = 'x86_64';
 
