@@ -364,20 +364,29 @@ my $qemu_params = [
 	['password', 'root_password', 'Qemu image root password'],
 	['opts', 'qemu_opts', 'Additional qemu command line options'],
 	['system', 'qemu_system', 'Qemu system such as x86_64'],
+	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
+	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
 ];
 
 sub qemu_init
 {
 	my %backend;
 	my $transport_fname = "transport-" . getppid();
-	$backend{'transport_fname'} = $transport_fname;
-	$backend{'qemu_params'} = "-enable-kvm -m 1.5G -smp 2 -display none -serial stdio";
-	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
-	$backend{'qemu_system'} = 'x86_64';
+	my $ram = "1.5G";
+	my $smp = 2;
 
 	parse_params(\%backend, "qemu", $qemu_params, @_);
 
+	$ram = $backend{'qemu_ram'} if (defined($backend{'qemu_ram'}));
+	$smp = $backend{'qemu_smp'} if (defined($backend{'qemu_smp'}));
+
+	$backend{'transport_fname'} = $transport_fname;
+	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none -serial stdio";
+	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
+	$backend{'qemu_system'} = 'x86_64';
+
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
+
 	$backend{'qemu_params'} .= ' -hda ' . $backend{'qemu_image'};
 
 	if (defined($backend{'qemu_opts'})) {
