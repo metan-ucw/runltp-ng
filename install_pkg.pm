@@ -53,19 +53,23 @@ sub foo_to_pkg
 	return $pkg_map{"$foo"};
 }
 
-sub install_pkg
+sub detect_distro
 {
-	my ($self, $foo) = @_;
-	my $distro;
+	my ($self) = @_;
 
 	if (backend::run_cmd($self, 'grep -q debian /etc/os-release') == 0) {
-		$distro = "debian";
+		return "debian";
 	} elsif (backend::run_cmd($self, 'grep -q opensuse /etc/os-release') == 0) {
-		$distro = "suse";
-	} else {
-		print("Unknown distribution!\n");
-		return 1;
+		return "suse";
 	}
+
+	print("Unknown distribution!\n");
+	return undef;
+}
+
+sub install_pkg
+{
+	my ($self, $distro, $foo) = @_;
 
 	my $pkg = foo_to_pkg($self, $foo, $distro);
 
@@ -80,24 +84,43 @@ sub install_pkg
 	}
 }
 
+sub update_pkg_db
+{
+	my ($self, $distro) = @_;
+
+	if ($distro eq "debian") {
+		return 1 if backend::run_cmd($self, "apt-get update");
+		return 0;
+	}
+}
+
 sub install_ltp_pkgs
 {
 	my ($self) = @_;
+	my $distro = detect_distro($self);
+
+	return unless defined($distro);
+
+	update_pkg_db($self, $distro);
 
 	# Attempt to install required packages
-	install_pkg($self, "git");
-	install_pkg($self, "unzip");
-	install_pkg($self, "make");
-	install_pkg($self, "autoconf");
-	install_pkg($self, "automake");
-	install_pkg($self, "gcc");
+	my @required_pkgs = ('make', 'autoconf', 'automake', 'gcc');
+
+	install_pkg($self, $distro, $_) foreach (@required_pkgs);
+
+	# We need at least one
+	install_pkg($self, $distro, "git");
+	install_pkg($self, $distro, "unzip");
 
 	# Attempt to install devel libraries
-	install_pkg($self, 'libaio-devel');
-	install_pkg($self, 'libacl-devel');
-	install_pkg($self, 'libattr-devel');
-	install_pkg($self, 'libcap-devel');
-	install_pkg($self, 'libnuma-devel');
+	my @devel_libs = (
+		'libaio-devel',
+		'libacl-devel',
+		'libattr-devel',
+		'libcap-devel',
+		'libnuma-devel');
+
+	install_pkg($self, $distro, $_) foreach (@devel_libs);
 }
 
 1;
