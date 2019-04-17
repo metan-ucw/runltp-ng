@@ -67,11 +67,37 @@ sub detect_distro
 	return undef;
 }
 
+sub pkg_to_m32
+{
+	my ($self, $distro, $pkg_name) = @_;
+
+	if ($distro eq "debian") {
+		#TODO: we need architecture detection for now default to i386
+		return "$pkg_name:i386";
+	}
+
+	return "$pkg_name-32bit" if ($distro eq "suse");
+
+	return undef;
+}
+
+sub setup_m32
+{
+	my ($self, $distro) = @_;
+
+	if ($distro eq "debian") {
+		backend::run_cmd($self, "dpkg --add-architecture i386");
+		backend::run_cmd($self, "apt-get update");
+	}
+}
+
 sub install_pkg
 {
-	my ($self, $distro, $foo) = @_;
+	my ($self, $distro, $foo, $m32) = @_;
 
 	my $pkg = foo_to_pkg($self, $foo, $distro);
+
+	$pkg = pkg_to_m32($self, $distro, $pkg) if ($m32);
 
 	if ($distro eq "debian") {
 		return 1 if (backend::run_cmd($self, "apt-get install -y $pkg"));
@@ -96,7 +122,7 @@ sub update_pkg_db
 
 sub install_ltp_pkgs
 {
-	my ($self) = @_;
+	my ($self, $m32) = @_;
 	my $distro = detect_distro($self);
 
 	return unless defined($distro);
@@ -121,6 +147,17 @@ sub install_ltp_pkgs
 		'libnuma-devel');
 
 	install_pkg($self, $distro, $_) foreach (@devel_libs);
+
+
+	if ($m32) {
+		setup_m32($self, $distro);
+
+		foreach ((@devel_libs, "gcc")) {
+			install_pkg($self, $distro, $_, $m32);
+		}
+	}
+
+	return 0;
 }
 
 1;

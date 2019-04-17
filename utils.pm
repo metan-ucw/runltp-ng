@@ -166,10 +166,10 @@ sub install_zip
 
 sub install_ltp
 {
-	my ($self, $revision) = @_;
+	my ($self, $revision, $m32) = @_;
 	my $ret;
 
-	install_pkg::install_ltp_pkgs($self);
+	install_pkg::install_ltp_pkgs($self, $m32);
 
 	if (backend::run_cmd($self, '[ -e /opt/ltp ]') == 0) {
 		backend::run_cmd($self, 'rm -rf /opt/ltp');
@@ -188,7 +188,12 @@ sub install_ltp
 		return 1;
 	}
 
-	if (backend::run_cmd($self, './configure')) {
+	my $configure = "./configure";
+
+	$configure = $configure . " CFLAGS=-m32" if $m32;
+	$configure = $configure . " LDFLAGS=-m32" if $m32;
+
+	if (backend::run_cmd($self, $configure)) {
 		print("./configure failed!\n");
 		return 1;
 	}
