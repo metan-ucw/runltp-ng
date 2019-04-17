@@ -94,6 +94,14 @@ well so that we can log in on the serial console.
 The force reboot is implemented by killing the qemu process and does not
 require any user specific setup.
 
+#### GRUB2 configuration
+
+To enable console on ttyS0 for a VM do:
+
+* open /etc/default/grub
+* add "console=ttyS0, console=tty0"  to 'GRUB\_CMDLINE\_LINUX'
+* run grub-mkconfig -o /boot/grub/grub.cfg
+
 ### SSH backend
 
 The ssh backend runs testcases runs testcases over SSH remote shell, the
