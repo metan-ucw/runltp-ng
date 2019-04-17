@@ -27,6 +27,7 @@ use log;
 use backend;
 use utils;
 use results;
+use install_pkg;
 
 my $backend_opts = "sh";
 my $help = '';
@@ -37,6 +38,7 @@ my $list;
 my $run;
 my $exclude;
 my $install;
+my $setup;
 my $cmd;
 
 GetOptions("backend=s" => \$backend_opts,
@@ -47,6 +49,7 @@ GetOptions("backend=s" => \$backend_opts,
            "run=s" => \$run,
            "exclude=s" => \$exclude,
            "install=s" => \$install,
+	   "setup" => \$setup,
 	   "cmd=s" => \$cmd,
            "verbose" => \$verbose)
 or die("Error in argument parsing!\n");
@@ -61,6 +64,7 @@ if ($help) {
 	print("--run=testgroup    : Execute group of tests\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
+	print("--setup            : Attempts to set up the machine (installs packages)\n\n");
 	print("--cmd=cmd          : Execute command\n\n");
 	print("Backend help\n------------\n\n");
 	print("--backend=sh|...[:param=val]...\n\n");
@@ -85,6 +89,11 @@ if ($sysinfo || $list) {
 
 backend::set_logfile($backend, "$logname.raw");
 backend::start($backend);
+
+if ($setup) {
+	install_pkg::install_ltp_pkgs($backend);
+	exit(0);
+}
 
 if ($cmd) {
 	my @result = backend::run_cmd($backend, $cmd);
