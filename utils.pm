@@ -76,28 +76,22 @@ sub collect_sysinfo
 	my %info;
 	my @log;
 
-	if (backend::check_cmd($self, 'uname')) {
-		@log = backend::run_cmd($self, 'printf uname-m; uname -m');
+	if (utils::check_cmd_retry($self, 'uname')) {
+		@log = utils::run_cmd_retry($self, 'for i in m p r; do printf uname-$i; uname -$i; done');
 		for (@log) {
 			if (m/uname-m(.*)/) {
 				$info{'arch'} = $1;
 			}
-		}
-		@log = backend::run_cmd($self, 'printf uname-p; uname -p');
-		for (@log) {
 			if (m/uname-p(.*)/) {
 				$info{'cpu'} = $1;
 			}
-		}
-		@log = backend::run_cmd($self, 'printf uname-r; uname -r');
-		for (@log) {
 			if (m/uname-r(.*)/) {
 				$info{'kernel'} = $1;
 			}
 		}
 	}
 
-	@log = backend::run_cmd($self, 'cat /proc/meminfo');
+	@log = utils::run_cmd_retry($self, 'cat /proc/meminfo');
 	for (@log) {
 		if (m/SwapTotal:\s+(\d+)\s+kB/) {
 			$info{'swap'} = format_memsize($1);
@@ -108,7 +102,7 @@ sub collect_sysinfo
 		}
 	}
 
-	@log = backend::run_cmd($self, 'cat /etc/os-release');
+	@log = utils::run_cmd_retry($self, 'cat /etc/os-release');
 	for (@log) {
 		if (m/^ID=\"?([^\"\n]*)\"?/) {
 			$info{'distribution'} = $1;
@@ -121,47 +115,29 @@ sub collect_sysinfo
 	return \%info;
 }
 
-sub install_git
+sub install_git_cmds
 {
-	my ($self, $revision) = @_;
+	my ($revision) = @_;
+	my @cmds;
 
-	if (backend::run_cmd($self, "git clone https://github.com/linux-test-project/ltp.git")) {
-		print("Failed to clone git!\n");
-		return 1;
-	}
+	push(@cmds, "git clone https://github.com/linux-test-project/ltp.git");
+	push(@cmds, "git checkout $revision") if ($revision);
 
-	if ($revision) {
-		if (backend::run_cmd($self, "cd ltp && git checkout $revision")) {
-			print("Failed to checkout $revision!\n");
-			return 1;
-		}
-	}
-
-	return 0;
+	return @cmds;
 }
 
-sub install_zip
+sub install_zip_cmds
 {
-	my ($self, $revision) = @_;
+	my ($revision) = @_;
+	my @cmds;
 
-	$revision = 'HEAD' if !defined($revision);
+	$revision //= 'HEAD';
 
-	if (backend::run_cmd($self, "wget http://github.com/linux-test-project/ltp/archive/$revision.zip -O ltp.zip")) {
-		print("Failed to download zip!\n");
-		return 1;
-	}
+	push(@cmds, "wget http://github.com/linux-test-project/ltp/archive/$revision.zip -O ltp.zip");
+	push(@cmds, "unzip ltp.zip");
+	push(@cmds, "mv ltp-* ltp");
 
-	if (backend::run_cmd($self, "unzip ltp.zip")) {
-		print("Failed to unzip archive!\n");
-		return 1;
-	}
-
-	if (backend::run_cmd($self, "mv ltp-* ltp && cd ltp")) {
-		printf("Failed to rename archive!\n");
-		return 1;
-	}
-
-	return 0;
+	return @cmds;
 }
 
 sub install_ltp
@@ -169,43 +145,32 @@ sub install_ltp
 	my ($self, $revision, $m32) = @_;
 	my $ret;
 
-	install_pkg::install_ltp_pkgs($self, $m32);
+	$ret = install_pkg::install_ltp_pkgs($self, $m32);
+	return $ret if ($ret);
 
-	if (backend::run_cmd($self, '[ -e /opt/ltp ]') == 0) {
-		backend::run_cmd($self, 'rm -rf /opt/ltp');
-	}
+	my @cmds = ();
 
-	backend::run_cmd($self, 'cd; if [ -e ltp/ ]; then rm -r ltp/; fi');
+	push(@cmds, 'if [ -e /opt/ltp ]; then rm -rf /opt/ltp; fi');
+	push(@cmds, 'cd; if [ -e ltp/ ]; then rm -r ltp/; fi');
 
-	if (backend::check_cmd($self, 'git')) {
-		return 1 if install_git($self, $revision);
+	if (check_cmd_retry($self, 'git')) {
+		push(@cmds, install_git_cmds($revision));
 	} else {
-		return 1 if install_zip($self, $revision);
+		push(@cmds, install_zip_cmds($revision));
 	}
 
-	if (backend::run_cmd($self, 'make autotools')) {
-		print("failed to create configure file!\n");
-		return 1;
-	}
+	push(@cmds, 'cd ltp');
+	push(@cmds, 'make autotools');
+	push(@cmds, './configure');
+	push(@cmds, 'make -j$(getconf _NPROCESSORS_ONLN)');
+	push(@cmds, 'make install');
 
-	my $configure = "./configure";
-
-	$configure = $configure . " CFLAGS=-m32" if $m32;
-	$configure = $configure . " LDFLAGS=-m32" if $m32;
-
-	if (backend::run_cmd($self, $configure)) {
-		print("./configure failed!\n");
-		return 1;
-	}
-
-	if (backend::run_cmd($self, 'make -j$(getconf _NPROCESSORS_ONLN)')) {
-		print("compilation failed!\n");
-		return 1;
-	}
-
-	if (backend::run_cmd($self, 'make install')) {
-		print("installation failed\n");
-		return 1;
+	my @results;
+	if (run_cmds_retry($self, \@cmds, results => \@results) != 0){
+		my $last = $results[$#results];
+		printf("Failed command: %s\n  output:\n%s\n",
+			$last->{cmd}, join("\n  ", @{$last->{log}}));
+		return $last->{ret};
 	}
 
 	return 0;
@@ -260,6 +225,7 @@ sub check_tainted
 	my ($self) = @_;
 	my $res;
 
+	# We do not use run_cmd_retry() here, cause we will track that state.
 	my ($ret, @log) = backend::run_cmd($self, "printf tainted-; cat /proc/sys/kernel/tainted", 600);
 
 	return undef if ($ret);
@@ -278,12 +244,16 @@ sub setup_ltp_run
 	my ($self, $runtest) = @_;
 	my @tests;
 
-	backend::run_cmd($self, "cd /opt/ltp/");
-	backend::run_cmd($self, 'export LTPROOT=$PWD');
-	backend::run_cmd($self, 'export TMPDIR=/tmp');
-	backend::run_cmd($self, 'export PATH=$LTPROOT/testcases/bin:$PATH');
-	@tests = backend::read_file($self, "runtest/$runtest") if defined($runtest);
-	backend::run_cmd($self, 'cd $LTPROOT/testcases/bin');
+	my $ret = utils::run_cmds_retry($self,
+		[
+			"cd /opt/ltp/",
+			'export LTPROOT=$PWD',
+			'export TMPDIR=/tmp',
+			'export PATH=$LTPROOT/testcases/bin:$PATH',
+			'cd $LTPROOT/testcases/bin',
+		]);
+
+	@tests = backend::read_file($self, "\$LTPROOT/runtest/$runtest") if defined($runtest) && $ret == 0;
 
 	return \@tests;
 }
@@ -295,6 +265,56 @@ sub reboot
 	print("$reason, attempting to reboot...\n");
 	backend::reboot($self);
 	setup_ltp_run($self);
+}
+
+
+=head2 run_cmds_retry
+
+    run_cmds_retry($self, <ARRAY of commands>, [timeout => <seconds>, retries => <number>, results => <array_ref>]);
+
+Run commands sequentially. If command has failed because of timeout, reboot the SUT.
+After reboot the sequence is restarted from the first  command.
+The sequence stops on the first command which exits with non zero.
+
+The function returns a array of hash refs or the exitcode of the last command in scalar context:
+  (
+	{ cmd=> <the command>, ret => <returnvalue>, log => <array ref of output lines> },
+	{ cmd=>'echo "foo"', ret => 0, log => ('foo') }
+	...
+  )
+=cut
+sub run_cmds_retry
+{
+	my ($self, $cmd, %args) = @_;
+	my @ret;
+	$args{retries} //= 3;
+
+	for my $cnt (1 .. $args{retries}) {
+		@ret = backend::run_cmds($self, $cmd, %args);
+		last if(defined($ret[$#ret]->{ret}));
+		if ($cnt == $args{retries}){
+			die ("Unable to recover SUT");
+		}
+		reboot($self, "Timeout on command: " . $ret[$#ret]->{cmd});
+	}
+	if ($args{results}){
+		push(@{$args{results}} , @ret);
+	}
+	wantarray ? @ret : $ret[$#ret]->{ret};
+}
+
+sub run_cmd_retry
+{
+	my ($self, $cmd, %args) = @_;
+	my ($ret) = run_cmds_retry($self, [$cmd], %args);
+	wantarray ? ($ret->{ret}, @{$ret->{log}}) : $ret->{ret};
+}
+
+sub check_cmd_retry
+{
+	my ($self, $cmd, %args) = @_;
+	my $ret = run_cmd_retry($self, $cmd, %args);
+	return $ret != 127;
 }
 
 sub run_ltp

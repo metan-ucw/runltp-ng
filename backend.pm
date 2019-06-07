@@ -179,6 +179,24 @@ sub run_cmd
 	wantarray? ($ret, @log) : $ret;
 }
 
+sub run_cmds
+{
+	my ($self, $cmds, %args) = @_;
+	my @log;
+
+	push(@log, {cmd=>'', ret=>0, log=>''}) unless (@{$cmds});
+
+	for my $cmd (@{$cmds}) {
+		my ($retval, @output) = run_cmd($self, $cmd, $args{timeout});
+		push(@log, {cmd=>$cmd, ret=>$retval, log => \@output});
+
+		unless (defined($retval) && $retval == 0) {
+		    return wantarray? @log : $retval;
+                }
+	}
+	return wantarray? @log : 0;
+}
+
 sub start
 {
 	my ($self) = @_;
@@ -575,12 +593,6 @@ sub set_logfile
 	$self->{'raw_logfile'} = $fh;
 }
 
-sub check_cmd
-{
-	my ($self, $cmd) = @_;
-	return run_cmd($self, $cmd) != 127;
-}
-
 sub read_file
 {
 	my ($self, $path) = @_;
@@ -589,7 +601,7 @@ sub read_file
 		return $self->{'read_file'}->($self, $path);
 	}
 
-	my @res = run_cmd($self, "cat $path");
+	my @res = utils::run_cmd_retry($self, "cat $path");
 
 	if ($res[0] != 0) {
 		print("Failed to read file $path");
