@@ -144,7 +144,7 @@ sub install_zip_cmds
 
 sub install_ltp
 {
-	my ($self, $revision, $m32) = @_;
+	my ($self, $ltpdir, $revision, $m32) = @_;
 	my $ret;
 
 	$ret = install_pkg::install_ltp_pkgs($self, $m32);
@@ -152,7 +152,7 @@ sub install_ltp
 
 	my @cmds = ();
 
-	push(@cmds, 'if [ -e /opt/ltp ]; then rm -rf /opt/ltp; fi');
+	push(@cmds, "if [ -e $ltpdir ]; then rm -rf $ltpdir; fi");
 	push(@cmds, 'cd; if [ -e ltp/ ]; then rm -r ltp/; fi');
 
 	if (check_cmd_retry($self, 'git')) {
@@ -163,7 +163,7 @@ sub install_ltp
 
 	push(@cmds, 'cd ltp');
 	push(@cmds, 'make autotools');
-	push(@cmds, './configure');
+	push(@cmds, "./configure --prefix=$ltpdir");
 	push(@cmds, 'make -j$(getconf _NPROCESSORS_ONLN)');
 	push(@cmds, 'make install');
 
@@ -244,21 +244,17 @@ sub check_tainted
 
 sub setup_ltp_run
 {
-	my ($self, $runtest) = @_;
+	my ($self, $ltpdir, $runtest) = @_;
 	my @tests;
 
 	my $ret = utils::run_cmds_retry($self,
 		[
-			"cd /opt/ltp/",
+			"cd $ltpdir",
 			'export LTPROOT=$PWD',
 			'export TMPDIR=/tmp',
 			'export PATH=$LTPROOT/testcases/bin:$PATH',
 			'cd $LTPROOT/testcases/bin',
 		]);
-
-	@tests = backend::read_file($self, "\$LTPROOT/runtest/$runtest") if defined($runtest) && $ret == 0;
-
-	return \@tests;
 }
 
 sub reboot
@@ -329,7 +325,7 @@ sub check_cmd_retry
 
 sub run_ltp
 {
-	my ($self, $runtest, $exclude) = @_;
+	my ($self, $ltpdir, $runtest, $exclude) = @_;
 	my @results;
 	my %reshash;
 
@@ -351,11 +347,13 @@ sub run_ltp
 		'warnings' => 0,
 	);
 
-	my $tests = setup_ltp_run($self, $runtest);
+    setup_ltp_run($self, $ltpdir);
+
+	my @tests = backend::read_file($self, "\$LTPROOT/runtest/$runtest");
 	my $start_tainted = check_tainted($self);
 	my $start_time = clock_gettime(CLOCK_MONOTONIC);
 
-	for (@$tests) {
+	for (@tests) {
 		next if m/^\s*($|#)/;
 		chomp;
 		my ($tid, $c) = split(/\s/, $_, 2);

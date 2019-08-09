@@ -322,6 +322,10 @@ sub qemu_start
 	run_string($self, "$self->{'root_password'}");
 	wait_prompt($self);
 	run_string($self, "export PS1=\$ ");
+
+    if (defined($self->{'qemu_virtfs'})) {
+        run_cmd($self, 'mount -t 9p -o trans=virtio host /mnt');
+    }
 }
 
 sub qemu_stop
@@ -397,6 +401,7 @@ my $qemu_params = [
 	['system', 'qemu_system', 'Qemu system such as x86_64'],
 	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
 	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
+    ['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
 ];
 
 sub qemu_init
@@ -418,11 +423,18 @@ sub qemu_init
 
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
 
-	$backend{'qemu_params'} .= ' -hda ' . $backend{'qemu_image'};
+	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
 
 	if (defined($backend{'qemu_opts'})) {
 		$backend{'qemu_params'} .= ' ' . $backend{'qemu_opts'};
 	}
+
+    if (defined($backend{'qemu_virtfs'})) {
+        $backend{'qemu_params'} .= ' -virtfs local' .
+            ',path=' . $backend{'qemu_virtfs'} .
+            ',mount_tag=host' .
+            ',security_model=mapped-xattr';
+    }
 
 	$backend{'start'} = \&qemu_start;
 	$backend{'stop'} = \&qemu_stop;

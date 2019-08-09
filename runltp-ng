@@ -37,6 +37,7 @@ my $verbose;
 my $list;
 my $run;
 my $exclude;
+my $ltpdir = '/opt/ltp';
 my $install;
 my $setup;
 my $cmd;
@@ -49,6 +50,7 @@ GetOptions("backend=s" => \$backend_opts,
            "list" => \$list,
            "run=s" => \$run,
            "exclude=s" => \$exclude,
+           "ltpdir=s" => \$ltpdir,
            "install=s" => \$install,
            "m32" => \$m32,
 	   "setup" => \$setup,
@@ -65,6 +67,7 @@ if ($help) {
 	print("--verbose          : Enables verbose mode\n\n");
 	print("--run=testgroup    : Execute group of tests\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
+    print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
 	print("--m32              : Build 32bit binaries on 64bit architecture\n\n");
 	print("--setup            : Attempts to set up the machine (installs packages)\n\n");
@@ -104,17 +107,19 @@ if ($cmd) {
 }
 
 if ($install) {
-	utils::install_ltp($backend, $install, $m32);
-} else {
-	if (!backend::run_cmd($backend, "! [ -e /opt/ltp ]")) {
-		utils::install_ltp($backend, undef, $m32);
-	}
+	utils::install_ltp($backend, $ltpdir, $install, $m32);
+}
+
+if (!backend::run_cmd($backend, "! [ -e $ltpdir ]")) {
+    backend::stop($backend);
+    print("LTP dir '$ltpdir' doesn't exist\n");
+    exit(0);
 }
 
 if ($run) {
 	my %results;
 	$results{'sysinfo'} = utils::collect_sysinfo($backend);
-	my ($stats, $test_results) = utils::run_ltp($backend, $run, $exclude);
+	my ($stats, $test_results) = utils::run_ltp($backend, $ltpdir, $run, $exclude);
 	$results{'tests'} = {'stats' => $stats, 'results' => $test_results};
 	results::writelog(\%results, "$logname.json");
 	results::writelog_html(\%results, "$logname.html");
