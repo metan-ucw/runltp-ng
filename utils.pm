@@ -142,7 +142,7 @@ sub install_zip_cmds
 
 sub install_ltp
 {
-	my ($self, $ltpdir, $revision, $m32) = @_;
+	my ($self, $ltpdir, $revision, $m32, $runtest) = @_;
 	my $ret;
 
 	$ret = install_pkg::install_ltp_pkgs($self, $m32);
@@ -161,7 +161,11 @@ sub install_ltp
 
 	push(@cmds, 'cd ltp');
 	push(@cmds, 'make autotools');
-	push(@cmds, "./configure --prefix=$ltpdir");
+    if (defined($runtest) && $runtest =~ "openposix") {
+        push(@cmds, "./configure --prefix=$ltpdir --with-open-posix-testsuite");
+    } else {
+        push(@cmds, "./configure --prefix=$ltpdir");
+    }
 	push(@cmds, 'make -j$(getconf _NPROCESSORS_ONLN)');
 	push(@cmds, 'make install');
 
@@ -219,6 +223,42 @@ sub parse_retval
 		$result->{'skipped'}++;
 		$stat->{'skipped'}++;
 	}
+}
+
+sub parse_retval_openposix
+{
+	my ($result, $stat, $ret) = @_;
+
+	# Kernel crashed, machine stopped responding
+	if (!defined($ret)) {
+		$result->{'broken'}++;
+		$stat->{'broken'}++;
+        return;
+	}
+
+	if ($ret == 0) {
+		$result->{'passed'}++;
+		$stat->{'passed'}++;
+		return;
+	}
+
+	# Command-not-found
+	if ($ret == 127) {
+		$result->{'broken'}++;
+		$stat->{'broken'}++;
+		return;
+	}
+
+	if ($ret == 1 || $ret == 2) {
+		$result->{'failed'}++;
+		$stat->{'failed'}++;
+	} elsif ($ret == 4 || $ret == 5) {
+		$result->{'skipped'}++;
+		$stat->{'skipped'}++;
+	} else {
+        $result->{'broken'}++;
+        $stat->{'broken'}++;
+    }
 }
 
 sub check_tainted
@@ -321,6 +361,32 @@ sub check_cmd_retry
 	return $ret != 127;
 }
 
+sub load_tests
+{
+    my ($self, $runtest) = @_;
+
+    if ($runtest =~ "openposix") {
+        my ($ret, @flist) =
+            backend::run_cmd($self, "find \$LTPROOT -name '*.run-test' > /tmp/openposix");
+
+        return backend::read_file($self, '/tmp/openposix');
+    }
+
+    return backend::read_file($self, "\$LTPROOT/runtest/$runtest");
+}
+
+sub parse_test
+{
+    my ($runtest, $line) = @_;
+
+    if ($runtest =~ "openposix") {
+        $line =~ /([-\w]+).run-test/;
+        return ($1, $line);
+    }
+
+    return split(/\s/, $line, 2);
+}
+
 sub run_ltp
 {
 	my ($self, $ltpdir, $runtest, $exclude) = @_;
@@ -347,14 +413,14 @@ sub run_ltp
 
     setup_ltp_run($self, $ltpdir);
 
-	my @tests = backend::read_file($self, "\$LTPROOT/runtest/$runtest");
+	my @tests = load_tests($self, $runtest);
 	my $start_tainted = check_tainted($self);
 	my $start_time = clock_gettime(CLOCK_MONOTONIC);
 
 	for (@tests) {
 		next if m/^\s*($|#)/;
 		chomp;
-		my ($tid, $c) = split(/\s/, $_, 2);
+		my ($tid, $c) = parse_test($runtest, $_);
 		next if ($exclude && $tid =~ $exclude);
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
@@ -375,7 +441,11 @@ sub run_ltp
 		$result->{'runtime'} += $test_end_time - $test_start_time;
 		$result->{'runs'} += 1;
 
-		parse_retval($result, \%stats, $ret);
+        if ($runtest =~ "openposix") {
+            parse_retval_openposix($result, \%stats, $ret);
+        } else {
+            parse_retval($result, \%stats, $ret);
+        }
 
 		if (!defined($reshash{$tid})) {
 			push(@results, $result);

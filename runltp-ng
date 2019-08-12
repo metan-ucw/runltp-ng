@@ -107,7 +107,7 @@ if ($cmd) {
 }
 
 if ($install) {
-	utils::install_ltp($backend, $ltpdir, $install, $m32);
+	utils::install_ltp($backend, $ltpdir, $install, $m32, $run);
 }
 
 if (!backend::run_cmd($backend, "! [ -e $ltpdir ]")) {
