@@ -59,13 +59,13 @@ sub print_sysinfo
 
 sub list_testgroups
 {
-	my ($self) = @_;
+	my ($self, $ltpdir) = @_;
 
-	if (backend::run_cmd($self, "[ -e /opt/ltp/ ]")) {
+	if (backend::run_cmd($self, "[ -e $ltpdir ]")) {
 		print("openposix\n");
 	}
 
-	my ($ret, @log) = backend::run_cmd($self, "ls /opt/ltp/runtest/");
+	my ($ret, @log) = backend::run_cmd($self, "ls $ltpdir/runtest/");
 
 	print ("$_\n") for (@log);
 }

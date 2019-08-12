@@ -88,7 +88,7 @@ if ($sysinfo || $list) {
 		$sysinfo = utils::collect_sysinfo($backend);
 		utils::print_sysinfo($sysinfo);
 	}
-	utils::list_testgroups($backend) if ($list);
+	utils::list_testgroups($backend, $ltpdir) if ($list);
 	backend::stop($backend);
 	exit(0);
 }
