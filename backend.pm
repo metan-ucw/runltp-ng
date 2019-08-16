@@ -229,7 +229,7 @@ sub serial_relay_force_stop
 
 	my $port = $self->{'serial_relay_port'};
 
-	msg("Resetting machine backend $self->{'backend_name'} serial relay port $port\n");
+	msg("Resetting machine backend $self->{'name'} serial relay port $port\n");
 
 	open(my $fh, '<', $port);
 	sleep(0.1);
