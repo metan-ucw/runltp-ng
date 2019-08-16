@@ -433,7 +433,8 @@ sub qemu_init
         $backend{'qemu_params'} .= ' -virtfs local' .
             ',path=' . $backend{'qemu_virtfs'} .
             ',mount_tag=host' .
-            ',security_model=mapped-xattr';
+            ',security_model=mapped-xattr' .
+            ',readonly';
     }
 
 	$backend{'start'} = \&qemu_start;
