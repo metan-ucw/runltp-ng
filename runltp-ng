@@ -36,6 +36,7 @@ my $sysinfo;
 my $verbose;
 my $list;
 my $run;
+my $interactive;
 my $exclude;
 my $ltpdir = '/opt/ltp';
 my $install;
@@ -49,6 +50,7 @@ GetOptions("backend=s" => \$backend_opts,
            "sysinfo" => \$sysinfo,
            "list" => \$list,
            "run=s" => \$run,
+           "interactive" => \$interactive,
            "exclude=s" => \$exclude,
            "ltpdir=s" => \$ltpdir,
            "install=s" => \$install,
@@ -66,6 +68,7 @@ if ($help) {
 	print("--list             : List test groups\n\n");
 	print("--verbose          : Enables verbose mode\n\n");
 	print("--run=testgroup    : Execute group of tests\n\n");
+    print("--interactive      : Print command to start interactive session with SUT\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
     print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
@@ -91,6 +94,11 @@ if ($sysinfo || $list) {
 	utils::list_testgroups($backend, $ltpdir) if ($list);
 	backend::stop($backend);
 	exit(0);
+}
+
+if ($interactive) {
+    backend::interactive($backend);
+    exit(0);
 }
 
 backend::set_logfile($backend, "$logname.raw");

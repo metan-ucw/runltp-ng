@@ -207,6 +207,17 @@ sub run_cmds
 	return wantarray? @log : 0;
 }
 
+sub interactive
+{
+    my ($self) = @_;
+
+    if (defined($self->{'interactive'})) {
+        msg('Run: ' . $self->{'interactive'}->($self) . "\n");
+    } else {
+        msg("Interactive not implemented for $self->{'name'}\n");
+    }
+}
+
 sub start
 {
 	my ($self) = @_;
@@ -286,10 +297,17 @@ sub qemu_read_file
 	return @lines;
 }
 
+sub qemu_cmdline
+{
+    my ($self) = @_;
+
+    return "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
+}
+
 sub qemu_start
 {
 	my ($self) = @_;
-	my $cmdline = "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
+	my $cmdline = qemu_cmdline($self);
 
 	msg("Starting qemu with: $cmdline\n");
 
@@ -437,6 +455,7 @@ sub qemu_init
             ',readonly';
     }
 
+    $backend{'interactive'} = \&qemu_cmdline;
 	$backend{'start'} = \&qemu_start;
 	$backend{'stop'} = \&qemu_stop;
 	$backend{'force_stop'} = \&qemu_stop;
@@ -613,7 +632,7 @@ sub new
 	my @backend_params = quotewords(':', 0, $opts);
 	my $backend_type = shift @backend_params;
 
-	msg("Running test with $backend_type parameters '@backend_params'\n");
+	msg("Using $backend_type backend; parameters '@backend_params'\n");
 
 	for (@backends) {
 		return $_->[2]->(@backend_params) if ($_->[0] eq $backend_type);
