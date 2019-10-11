@@ -186,6 +186,7 @@ sub parse_retval
 	if (!defined($ret)) {
 		$result->{'broken'}++;
 		$stat->{'broken'}++;
+		return;
 	}
 
 	if ($ret == 0) {
