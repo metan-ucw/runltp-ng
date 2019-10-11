@@ -121,7 +121,9 @@ sub install_git_cmds
 	my @cmds;
 
 	push(@cmds, "git clone https://github.com/linux-test-project/ltp.git");
+	push(@cmds, "cd ltp");
 	push(@cmds, "git checkout $revision") if ($revision);
+	push(@cmds, "cd ..");
 
 	return @cmds;
 }
