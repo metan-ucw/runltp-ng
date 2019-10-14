@@ -23,6 +23,8 @@ package backend;
 use strict;
 use warnings;
 
+use Time::HiRes qw(clock_gettime CLOCK_MONOTONIC);
+
 use IPC::Open2;
 use POSIX ":sys_wait_h";
 use Fcntl;
@@ -96,6 +98,8 @@ sub wait_regexp
 
 	msg("Waiting for regexp '$regexp'\n");
 
+	my $start_time = clock_gettime(CLOCK_MONOTONIC);
+
 	while (1) {
 		$line = try_readline($self, $timeout);
 
@@ -116,6 +120,11 @@ sub wait_regexp
 			print($fh "$l\n") if defined($fh);
 		}
 		#print("N: $self->{'name'}: $line\n") if $verbose;
+
+		if (defined($timeout) and clock_gettime(CLOCK_MONOTONIC) - $start_time > $timeout) {
+			msg("$self->{'name'}: timeouted!\n");
+			return @log;
+		}
 
 		next if (defined($newline) && $newline && $line !~ /\n/);
 
