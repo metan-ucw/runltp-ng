@@ -30,6 +30,7 @@ use POSIX ":sys_wait_h";
 use Fcntl;
 use Errno;
 use IO::Poll qw(POLLIN);
+use Text::ParseWords;
 
 use log;
 
@@ -240,20 +241,23 @@ sub force_stop
 	my ($self) = @_;
 
 	if (defined($self->{'force_stop'})) {
-		$self->{'force_stop'}->($self);
+		return $self->{'force_stop'}->($self);
 	} else {
 		print("Backend $self->{'name'} has to be force stopped manually\n");
 		print("Please bring the machine into usable state and then press any key\n");
 		<STDIN>;
 	}
+	return 0;
 }
 
 sub reboot
 {
 	my ($self) = @_;
 
-	force_stop($self);
-	start($self);
+	my $ret = force_stop($self);
+	return $ret if ($ret != 0);
+	$ret = start($self);
+	return $ret;
 }
 
 sub qemu_read_file
@@ -447,16 +451,16 @@ sub ssh_start
 	msg("Starting ssh: $cmdline\n");
 
 	my ($ssh_out, $ssh_in);
-	my $pid = open2($ssh_out, $ssh_in, $cmdline) or die("Fork failed");
+	my $pid = open2($ssh_out, $ssh_in, $cmdline) or return -1;
 
 	$self->{'pid'} = $pid;
 	$self->{'in_fd'} = $ssh_in;
 	$self->{'out_fd'} = $ssh_out;
 
 	my $flags=0;
-	fcntl($ssh_out, &F_GETFL, $flags) || die $!;
+	fcntl($ssh_out, &F_GETFL, $flags) || return -1;
 	$flags |= &O_NONBLOCK;
-	fcntl($ssh_out, &F_SETFL, $flags) || die $!;
+	fcntl($ssh_out, &F_SETFL, $flags) || return -1;
 
 	msg("Waiting for prompt\n");
 
@@ -470,6 +474,7 @@ sub ssh_start
 		run_string($self, 'sudo /bin/sh');
 		wait_prompt($self);
 	}
+	return 0;
 }
 
 sub ssh_stop
@@ -500,7 +505,22 @@ my $ssh_params = [
 	['user', 'ssh_user', "Remote user, if other then root use sudo to get root"],
 	['key_file', 'ssh_key', 'File for public key authentication'],
 	['serial_relay_port', 'serial_relay_port', "Serial relay poor man's reset dongle port"],
+	['reset_command', 'reset_command', 'If SUT hang, given command is '
+		. 'executed to reset. If command exit with error, test gets '
+		. 'stopped otherwise ssh connection will be reinitalized. ']
 ];
+
+sub ssh_reset_command
+{
+	my ($self) = @_;
+	my $cmd = $self->{'reset_command'};
+
+	my $out = qx/$cmd/;
+	if ($? != 0){
+		msg("SSH reset_command failed: $out");
+	}
+	return $? >> 8;
+}
 
 sub ssh_init
 {
@@ -518,6 +538,9 @@ sub ssh_init
 	$backend{'stop'} = \&ssh_stop;
 	if ($backend{'serial_relay_port'}) {
 		$backend{'force_stop'} = \&ssh_force_stop;
+	}
+	elsif ($backend{'reset_command'}) {
+		$backend{'force_stop'} = \&ssh_reset_command;
 	}
 	$backend{'name'} = 'ssh';
 	$backend{'buf'} = '';
@@ -574,7 +597,7 @@ sub new
 {
 	my ($opts) = @_;
 
-	my @backend_params = split(':', $opts);
+	my @backend_params = quotewords(':', 0, $opts);
 	my $backend_type = shift @backend_params;
 
 	msg("Running test with $backend_type parameters '@backend_params'\n");
