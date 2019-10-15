@@ -117,10 +117,10 @@ sub collect_sysinfo
 
 sub install_git_cmds
 {
-	my ($revision) = @_;
+	my ($revision, $uri) = @_;
 	my @cmds;
 
-	push(@cmds, "git clone https://github.com/linux-test-project/ltp.git");
+	push(@cmds, "git clone $uri ltp");
 	push(@cmds, "git -C ltp checkout $revision") if ($revision);
 
 	return @cmds;
@@ -128,12 +128,13 @@ sub install_git_cmds
 
 sub install_zip_cmds
 {
-	my ($revision) = @_;
+	my ($revision, $uri) = @_;
 	my @cmds;
 
 	$revision //= 'HEAD';
+    $uri =~ s/.git$//;
 
-	push(@cmds, "wget http://github.com/linux-test-project/ltp/archive/$revision.zip -O ltp.zip");
+	push(@cmds, "wget $uri/archive/$revision.zip -O ltp.zip");
 	push(@cmds, "unzip ltp.zip");
 	push(@cmds, "mv ltp-* ltp");
 
@@ -142,8 +143,10 @@ sub install_zip_cmds
 
 sub install_ltp
 {
-	my ($self, $ltpdir, $revision, $m32, $runtest) = @_;
+	my ($self, $ltpdir, $revision, $m32, $runtest, $uri) = @_;
 	my $ret;
+
+    $uri //= 'http://github.com/linux-test-project/ltp.git';
 
 	$ret = install_pkg::install_ltp_pkgs($self, $m32);
 	return $ret if ($ret);
@@ -154,9 +157,9 @@ sub install_ltp
 	push(@cmds, 'cd; if [ -e ltp/ ]; then rm -r ltp/; fi');
 
 	if (check_cmd_retry($self, 'git')) {
-		push(@cmds, install_git_cmds($revision));
+		push(@cmds, install_git_cmds($revision, $uri));
 	} else {
-		push(@cmds, install_zip_cmds($revision));
+		push(@cmds, install_zip_cmds($revision, $uri));
 	}
 
 	push(@cmds, 'cd ltp');
