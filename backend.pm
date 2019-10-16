@@ -370,7 +370,7 @@ sub qemu_stop
 	msg("Failed to stop qemu, killing it!\n");
 
 	kill('TERM', $self->{'pid'});
-	waitpid($self->{'pid'}, 0);
+	return waitpid($self->{'pid'}, 0) < 0 ? -1 : 0
 }
 
 sub print_help

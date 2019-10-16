@@ -296,16 +296,18 @@ sub setup_ltp_run
 			'export PATH=$LTPROOT/testcases/bin:$PATH',
 			'cd $LTPROOT/testcases/bin',
 		]);
+
+    return $ret;
 }
 
 sub reboot
 {
-	my ($self, $reason) = @_;
+	my ($self, $reason, $ltpdir) = @_;
 
 	print("$reason, attempting to reboot...\n");
 	my $ret = backend::reboot($self);
 	return $ret if ($ret != 0);
-	return -1 if (!setup_ltp_run($self));
+	return -1 if (setup_ltp_run($self, $ltpdir) != 0);
 	return 0;
 }
 
@@ -456,13 +458,13 @@ sub run_ltp
 		}
 
 		if (!defined($ret)) {
-			last if (reboot($self, 'Machine stopped respoding') != 0);
+			last if(reboot($self, 'Machine stopped respoding', $ltpdir) != 0);
 		} elsif ($ret) {
 			my $tainted = check_tainted($self);
-                        my $err_msg = defined($tainted) ?
-                            'Kernel was tained' : 'Machine stopped responding';
+            my $err_msg = defined($tainted) ?
+                'Kernel was tained' : 'Machine stopped responding';
 			if ($tainted != $start_tainted) {
-				last if(reboot($self, $err_msg) != 0);
+				last if(reboot($self, $err_msg, $ltpdir) != 0);
 			}
 		}
 	}
