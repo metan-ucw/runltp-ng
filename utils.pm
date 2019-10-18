@@ -34,11 +34,11 @@ sub format_memsize
 	my ($size) = @_;
 
 	if ($size >= 1024 * 1024) {
-		return sprintf("%.2f GB ($size KB)", $size/(1024 * 1024));
+		return sprintf("%.2f GB ($size KB)", $size / (1024 * 1024));
 	}
 
 	if ($size >= 1024) {
-		return sprintf("%.2f MB ($size KB)", $size/1024);
+		return sprintf("%.2f MB ($size KB)", $size / 1024);
 	}
 
 	return "$size KB";
@@ -67,7 +67,7 @@ sub list_testgroups
 
 	my ($ret, @log) = backend::run_cmd($self, "ls $ltpdir/runtest/");
 
-	print ("$_\n") for (@log);
+	print("$_\n") for (@log);
 }
 
 sub collect_sysinfo
@@ -132,7 +132,7 @@ sub install_zip_cmds
 	my @cmds;
 
 	$revision //= 'HEAD';
-    $uri =~ s/.git$//;
+	$uri =~ s/.git$//;
 
 	push(@cmds, "wget $uri/archive/$revision.zip -O ltp.zip");
 	push(@cmds, "unzip ltp.zip");
@@ -146,7 +146,7 @@ sub install_ltp
 	my ($self, $ltpdir, $revision, $m32, $runtest, $uri) = @_;
 	my $ret;
 
-    $uri //= 'http://github.com/linux-test-project/ltp.git';
+	$uri //= 'http://github.com/linux-test-project/ltp.git';
 
 	$ret = install_pkg::install_ltp_pkgs($self, $m32);
 	return $ret if ($ret);
@@ -164,16 +164,16 @@ sub install_ltp
 
 	push(@cmds, 'cd ltp');
 	push(@cmds, 'make autotools');
-    if (defined($runtest) && $runtest =~ "openposix") {
-        push(@cmds, "./configure --prefix=$ltpdir --with-open-posix-testsuite");
-    } else {
-        push(@cmds, "./configure --prefix=$ltpdir");
-    }
+	if (defined($runtest) && $runtest =~ "openposix") {
+		push(@cmds, "./configure --prefix=$ltpdir --with-open-posix-testsuite");
+	} else {
+		push(@cmds, "./configure --prefix=$ltpdir");
+	}
 	push(@cmds, 'make -j$(getconf _NPROCESSORS_ONLN)');
 	push(@cmds, 'make install');
 
 	my @results;
-	if (run_cmds_retry($self, \@cmds, results => \@results) != 0){
+	if (run_cmds_retry($self, \@cmds, results => \@results) != 0) {
 		my $last = $results[$#results];
 		printf("Failed command: %s\n  output:\n%s\n",
 			$last->{cmd}, join("\n  ", @{$last->{log}}));
@@ -236,7 +236,7 @@ sub parse_retval_openposix
 	if (!defined($ret)) {
 		$result->{'broken'}++;
 		$stat->{'broken'}++;
-        return;
+		return;
 	}
 
 	if ($ret == 0) {
@@ -259,9 +259,9 @@ sub parse_retval_openposix
 		$result->{'skipped'}++;
 		$stat->{'skipped'}++;
 	} else {
-        $result->{'broken'}++;
-        $stat->{'broken'}++;
-    }
+		$result->{'broken'}++;
+		$stat->{'broken'}++;
+	}
 }
 
 sub check_tainted
@@ -297,7 +297,7 @@ sub setup_ltp_run
 			'cd $LTPROOT/testcases/bin',
 		]);
 
-    return $ret;
+	return $ret;
 }
 
 sub reboot
@@ -335,19 +335,19 @@ sub run_cmds_retry
 
 	for my $cnt (1 .. $args{retries}) {
 		@ret = backend::run_cmds($self, $cmd, %args);
-		last if(defined($ret[$#ret]->{ret}));
-		if ($cnt == $args{retries}){
-			die ("Unable to recover SUT");
+		last if (defined($ret[$#ret]->{ret}));
+		if ($cnt == $args{retries}) {
+			die("Unable to recover SUT");
 		}
 		my $reboot_msg = "Timeout on command: " . $ret[$#ret]->{cmd};
 		my $reboot_ret = reboot($self, $reboot_msg);
-		if ($reboot_ret != 0){
-			push(@ret, {cmd=>'reboot-sut', ret=>$reboot_ret, log => $reboot_msg});
+		if ($reboot_ret != 0) {
+			push(@ret, {cmd => 'reboot-sut', ret => $reboot_ret, log => $reboot_msg});
 			last;
 		}
 	}
-	if ($args{results}){
-		push(@{$args{results}} , @ret);
+	if ($args{results}) {
+		push(@{$args{results}}, @ret);
 	}
 	wantarray ? @ret : $ret[$#ret]->{ret};
 }
@@ -368,28 +368,28 @@ sub check_cmd_retry
 
 sub load_tests
 {
-    my ($self, $runtest) = @_;
+	my ($self, $runtest) = @_;
 
-    if ($runtest =~ "openposix") {
-        my ($ret, @flist) =
-            backend::run_cmd($self, "find \$LTPROOT -name '*.run-test' > /tmp/openposix");
+	if ($runtest =~ "openposix") {
+		my ($ret, @flist) =
+			backend::run_cmd($self, "find \$LTPROOT -name '*.run-test' > /tmp/openposix");
 
-        return backend::read_file($self, '/tmp/openposix');
-    }
+		return backend::read_file($self, '/tmp/openposix');
+	}
 
-    return backend::read_file($self, "\$LTPROOT/runtest/$runtest");
+	return backend::read_file($self, "\$LTPROOT/runtest/$runtest");
 }
 
 sub parse_test
 {
-    my ($runtest, $line) = @_;
+	my ($runtest, $line) = @_;
 
-    if ($runtest =~ "openposix") {
-        $line =~ /([-\w]+).run-test/;
-        return ($1, $line);
-    }
+	if ($runtest =~ "openposix") {
+		$line =~ /([-\w]+).run-test/;
+		return ($1, $line);
+	}
 
-    return split(/\s/, $line, 2);
+	return split(/\s/, $line, 2);
 }
 
 sub run_ltp
@@ -416,7 +416,7 @@ sub run_ltp
 		'warnings' => 0,
 	);
 
-    setup_ltp_run($self, $ltpdir);
+	setup_ltp_run($self, $ltpdir);
 
 	my @tests = load_tests($self, $runtest);
 	my $start_tainted = check_tainted($self);
@@ -446,11 +446,11 @@ sub run_ltp
 		$result->{'runtime'} += $test_end_time - $test_start_time;
 		$result->{'runs'} += 1;
 
-        if ($runtest =~ "openposix") {
-            parse_retval_openposix($result, \%stats, $ret);
-        } else {
-            parse_retval($result, \%stats, $ret);
-        }
+		if ($runtest =~ "openposix") {
+			parse_retval_openposix($result, \%stats, $ret);
+		} else {
+			parse_retval($result, \%stats, $ret);
+		}
 
 		if (!defined($reshash{$tid})) {
 			push(@results, $result);
@@ -458,13 +458,12 @@ sub run_ltp
 		}
 
 		if (!defined($ret)) {
-			last if(reboot($self, 'Machine stopped respoding', $ltpdir) != 0);
+			last if (reboot($self, 'Machine stopped respoding', $ltpdir) != 0);
 		} elsif ($ret) {
 			my $tainted = check_tainted($self);
-            my $err_msg = defined($tainted) ?
-                'Kernel was tained' : 'Machine stopped responding';
+			my $err_msg = defined($tainted) ? 'Kernel was tained' : 'Machine stopped responding';
 			if ($tainted != $start_tainted) {
-				last if(reboot($self, $err_msg, $ltpdir) != 0);
+				last if (reboot($self, $err_msg, $ltpdir) != 0);
 			}
 		}
 	}

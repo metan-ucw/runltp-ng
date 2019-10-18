@@ -157,7 +157,7 @@ sub run_string
 
 	msg("Writing string '$string'\n");
 
-	print($in_fd  "$string\n");
+	print($in_fd "$string\n");
 }
 
 my $cmd_seq_cnt = 0;
@@ -182,11 +182,11 @@ sub run_cmd
 		$ret = undef;
 	}
 
-	$cmd_seq_cnt+=1;
+	$cmd_seq_cnt += 1;
 
 	wait_prompt($self);
 
-	wantarray? ($ret, @log) : $ret;
+	wantarray ? ($ret, @log) : $ret;
 }
 
 sub run_cmds
@@ -194,28 +194,28 @@ sub run_cmds
 	my ($self, $cmds, %args) = @_;
 	my @log;
 
-	push(@log, {cmd=>'', ret=>0, log=>''}) unless (@{$cmds});
+	push(@log, {cmd => '', ret => 0, log => ''}) unless (@{$cmds});
 
 	for my $cmd (@{$cmds}) {
 		my ($retval, @output) = run_cmd($self, $cmd, $args{timeout});
-		push(@log, {cmd=>$cmd, ret=>$retval, log => \@output});
+		push(@log, {cmd => $cmd, ret => $retval, log => \@output});
 
 		unless (defined($retval) && $retval == 0) {
-		    return wantarray? @log : $retval;
-                }
+			return wantarray ? @log : $retval;
+		}
 	}
-	return wantarray? @log : 0;
+	return wantarray ? @log : 0;
 }
 
 sub interactive
 {
-    my ($self) = @_;
+	my ($self) = @_;
 
-    if (defined($self->{'interactive'})) {
-        msg('Run: ' . $self->{'interactive'}->($self) . "\n");
-    } else {
-        msg("Interactive not implemented for $self->{'name'}\n");
-    }
+	if (defined($self->{'interactive'})) {
+		msg('Run: ' . $self->{'interactive'}->($self) . "\n");
+	} else {
+		msg("Interactive not implemented for $self->{'name'}\n");
+	}
 }
 
 sub start
@@ -299,9 +299,9 @@ sub qemu_read_file
 
 sub qemu_cmdline
 {
-    my ($self) = @_;
+	my ($self) = @_;
 
-    return "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
+	return "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
 }
 
 sub qemu_start
@@ -341,9 +341,9 @@ sub qemu_start
 	wait_prompt($self);
 	run_string($self, "export PS1=\$ ");
 
-    if (defined($self->{'qemu_virtfs'})) {
-        run_cmd($self, 'mount -t 9p -o trans=virtio host /mnt');
-    }
+	if (defined($self->{'qemu_virtfs'})) {
+		run_cmd($self, 'mount -t 9p -o trans=virtio host /mnt');
+	}
 }
 
 sub qemu_stop
@@ -370,7 +370,7 @@ sub qemu_stop
 	msg("Failed to stop qemu, killing it!\n");
 
 	kill('TERM', $self->{'pid'});
-	return waitpid($self->{'pid'}, 0) < 0 ? -1 : 0
+	return waitpid($self->{'pid'}, 0) < 0 ? -1 : 0;
 }
 
 sub print_help
@@ -419,7 +419,7 @@ my $qemu_params = [
 	['system', 'qemu_system', 'Qemu system such as x86_64'],
 	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
 	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
-    ['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
+	['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
 ];
 
 sub qemu_init
@@ -447,15 +447,15 @@ sub qemu_init
 		$backend{'qemu_params'} .= ' ' . $backend{'qemu_opts'};
 	}
 
-    if (defined($backend{'qemu_virtfs'})) {
-        $backend{'qemu_params'} .= ' -virtfs local' .
-            ',path=' . $backend{'qemu_virtfs'} .
-            ',mount_tag=host' .
-            ',security_model=mapped-xattr' .
-            ',readonly';
-    }
+	if (defined($backend{'qemu_virtfs'})) {
+		$backend{'qemu_params'} .= ' -virtfs local' .
+			',path=' . $backend{'qemu_virtfs'} .
+			',mount_tag=host' .
+			',security_model=mapped-xattr' .
+			',readonly';
+	}
 
-    $backend{'interactive'} = \&qemu_cmdline;
+	$backend{'interactive'} = \&qemu_cmdline;
 	$backend{'start'} = \&qemu_start;
 	$backend{'stop'} = \&qemu_stop;
 	$backend{'force_stop'} = \&qemu_stop;
@@ -489,18 +489,18 @@ sub ssh_start
 	$self->{'in_fd'} = $ssh_in;
 	$self->{'out_fd'} = $ssh_out;
 
-	my $flags=0;
-	fcntl($ssh_out, &F_GETFL, $flags) || return -1;
-	$flags |= &O_NONBLOCK;
-	fcntl($ssh_out, &F_SETFL, $flags) || return -1;
+	my $flags = 0;
+	fcntl($ssh_out, F_GETFL, $flags) || return -1;
+	$flags |= O_NONBLOCK;
+	fcntl($ssh_out, F_SETFL, $flags) || return -1;
 
 	msg("Waiting for prompt\n");
 
-	unless ($key){
+	unless ($key) {
 		wait_regexp($self, qr/[Pp]assword:/);
 		run_string($self, $self->{'root_password'});
 	}
-	sleep(1); #hack wait for prompt
+	sleep(1);    #hack wait for prompt
 	wait_prompt($self);
 	if ($user ne 'root') {
 		run_string($self, 'sudo /bin/sh');
@@ -538,8 +538,8 @@ my $ssh_params = [
 	['key_file', 'ssh_key', 'File for public key authentication'],
 	['serial_relay_port', 'serial_relay_port', "Serial relay poor man's reset dongle port"],
 	['reset_command', 'reset_command', 'If SUT hang, given command is '
-		. 'executed to reset. If command exit with error, test gets '
-		. 'stopped otherwise ssh connection will be reinitalized. ']
+			. 'executed to reset. If command exit with error, test gets '
+			. 'stopped otherwise ssh connection will be reinitalized. ']
 ];
 
 sub ssh_reset_command
@@ -548,7 +548,7 @@ sub ssh_reset_command
 	my $cmd = $self->{'reset_command'};
 
 	my $out = qx/$cmd/;
-	if ($? != 0){
+	if ($? != 0) {
 		msg("SSH reset_command failed: $out");
 	}
 	return $? >> 8;
@@ -563,7 +563,7 @@ sub ssh_init
 	die("ssh:host must be set!") unless defined($backend{'ssh_host'});
 	die("ssh:password or ssh:key_file must be set!")
 		unless (defined($backend{'root_password'})
-			|| defined($backend{'ssh_key'}));
+		|| defined($backend{'ssh_key'}));
 	$backend{'ssh_user'} //= 'root';
 
 	$backend{'start'} = \&ssh_start;

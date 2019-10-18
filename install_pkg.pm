@@ -87,20 +87,20 @@ sub setup_m32
 	my ($distro) = @_;
 
 	if ($distro eq "debian") {
-		return ( "dpkg --add-architecture i386", "apt-get update");
+		return ("dpkg --add-architecture i386", "apt-get update");
 	}
 	return;
 }
 
 sub install_pkg
 {
-        my ($distro, $foos, $m32) = @_;
+	my ($distro, $foos, $m32) = @_;
 
-	$foos = [ $foos ] unless (ref($foos) eq 'ARRAY');
+	$foos = [$foos] unless (ref($foos) eq 'ARRAY');
 
 	my @pkgs = map { foo_to_pkg($_, $distro) } @{$foos};
 
-	@pkgs = map{ pkg_to_m32($distro, $_)} @pkgs if ($m32);
+	@pkgs = map { pkg_to_m32($distro, $_) } @pkgs if ($m32);
 
 	if ($distro eq 'debian') {
 		return 'apt-get install -y ' . join(' ', @pkgs);
@@ -133,11 +133,11 @@ sub install_ltp_pkgs
 	my @required_pkgs = ('make', 'autoconf', 'automake', 'gcc');
 
 	# We need at least one
-        push(@required_pkgs, 'git');
-        push(@required_pkgs, 'unzip');
+	push(@required_pkgs, 'git');
+	push(@required_pkgs, 'unzip');
 
 	# Attempt to install devel libraries
-        my @devel_libs = (
+	my @devel_libs = (
 		'libaio-devel',
 		'libacl-devel',
 		'libattr-devel',
@@ -145,18 +145,18 @@ sub install_ltp_pkgs
 		'libnuma-devel');
 	push(@required_pkgs, @devel_libs);
 
-        my @cmds = ();
+	my @cmds = ();
 	push(@cmds, update_pkg_db($distro));
-        push(@cmds, install_pkg($distro,\@required_pkgs));
+	push(@cmds, install_pkg($distro, \@required_pkgs));
 
 	if ($m32) {
 		push(@cmds, setup_m32($distro));
-		push(@cmds, install_pkg($distro,\@devel_libs, $m32));
+		push(@cmds, install_pkg($distro, \@devel_libs, $m32));
 		push(@cmds, install_pkg($distro, 'gcc', $m32));
 	}
 
 	my @results;
-	if (utils::run_cmds_retry($self, \@cmds, results => \@results) != 0){
+	if (utils::run_cmds_retry($self, \@cmds, results => \@results) != 0) {
 		my $last = $results[$#results];
 		printf("Failed command: %s\n  output:\n%s\n",
 			$last->{cmd}, join("\n  ", @{$last->{log}}));
