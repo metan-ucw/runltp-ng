@@ -59,13 +59,13 @@ sub print_sysinfo
 
 sub list_testgroups
 {
-	my ($self) = @_;
+	my ($self, $ltpdir) = @_;
 
-	if (backend::run_cmd($self, "[ -e /opt/ltp/ ]")) {
+	if (backend::run_cmd($self, "[ -e $ltpdir ]")) {
 		print("openposix\n");
 	}
 
-	my ($ret, @log) = backend::run_cmd($self, "ls /opt/ltp/runtest/");
+	my ($ret, @log) = backend::run_cmd($self, "ls $ltpdir/runtest/");
 
 	print ("$_\n") for (@log);
 }
@@ -117,25 +117,24 @@ sub collect_sysinfo
 
 sub install_git_cmds
 {
-	my ($revision) = @_;
+	my ($revision, $uri) = @_;
 	my @cmds;
 
-	push(@cmds, "git clone https://github.com/linux-test-project/ltp.git");
-	push(@cmds, "cd ltp");
-	push(@cmds, "git checkout $revision") if ($revision);
-	push(@cmds, "cd ..");
+	push(@cmds, "git clone $uri ltp");
+	push(@cmds, "git -C ltp checkout $revision") if ($revision);
 
 	return @cmds;
 }
 
 sub install_zip_cmds
 {
-	my ($revision) = @_;
+	my ($revision, $uri) = @_;
 	my @cmds;
 
 	$revision //= 'HEAD';
+    $uri =~ s/.git$//;
 
-	push(@cmds, "wget http://github.com/linux-test-project/ltp/archive/$revision.zip -O ltp.zip");
+	push(@cmds, "wget $uri/archive/$revision.zip -O ltp.zip");
 	push(@cmds, "unzip ltp.zip");
 	push(@cmds, "mv ltp-* ltp");
 
@@ -144,26 +143,32 @@ sub install_zip_cmds
 
 sub install_ltp
 {
-	my ($self, $revision, $m32) = @_;
+	my ($self, $ltpdir, $revision, $m32, $runtest, $uri) = @_;
 	my $ret;
+
+    $uri //= 'http://github.com/linux-test-project/ltp.git';
 
 	$ret = install_pkg::install_ltp_pkgs($self, $m32);
 	return $ret if ($ret);
 
 	my @cmds = ();
 
-	push(@cmds, 'if [ -e /opt/ltp ]; then rm -rf /opt/ltp; fi');
+	push(@cmds, "if [ -e $ltpdir ]; then rm -rf $ltpdir; fi");
 	push(@cmds, 'cd; if [ -e ltp/ ]; then rm -r ltp/; fi');
 
 	if (check_cmd_retry($self, 'git')) {
-		push(@cmds, install_git_cmds($revision));
+		push(@cmds, install_git_cmds($revision, $uri));
 	} else {
-		push(@cmds, install_zip_cmds($revision));
+		push(@cmds, install_zip_cmds($revision, $uri));
 	}
 
 	push(@cmds, 'cd ltp');
 	push(@cmds, 'make autotools');
-	push(@cmds, './configure');
+    if (defined($runtest) && $runtest =~ "openposix") {
+        push(@cmds, "./configure --prefix=$ltpdir --with-open-posix-testsuite");
+    } else {
+        push(@cmds, "./configure --prefix=$ltpdir");
+    }
 	push(@cmds, 'make -j$(getconf _NPROCESSORS_ONLN)');
 	push(@cmds, 'make install');
 
@@ -223,6 +228,42 @@ sub parse_retval
 	}
 }
 
+sub parse_retval_openposix
+{
+	my ($result, $stat, $ret) = @_;
+
+	# Kernel crashed, machine stopped responding
+	if (!defined($ret)) {
+		$result->{'broken'}++;
+		$stat->{'broken'}++;
+        return;
+	}
+
+	if ($ret == 0) {
+		$result->{'passed'}++;
+		$stat->{'passed'}++;
+		return;
+	}
+
+	# Command-not-found
+	if ($ret == 127) {
+		$result->{'broken'}++;
+		$stat->{'broken'}++;
+		return;
+	}
+
+	if ($ret == 1 || $ret == 2) {
+		$result->{'failed'}++;
+		$stat->{'failed'}++;
+	} elsif ($ret == 4 || $ret == 5) {
+		$result->{'skipped'}++;
+		$stat->{'skipped'}++;
+	} else {
+        $result->{'broken'}++;
+        $stat->{'broken'}++;
+    }
+}
+
 sub check_tainted
 {
 	my ($self) = @_;
@@ -244,31 +285,29 @@ sub check_tainted
 
 sub setup_ltp_run
 {
-	my ($self, $runtest) = @_;
+	my ($self, $ltpdir, $runtest) = @_;
 	my @tests;
 
 	my $ret = utils::run_cmds_retry($self,
 		[
-			"cd /opt/ltp/",
+			"cd $ltpdir",
 			'export LTPROOT=$PWD',
 			'export TMPDIR=/tmp',
 			'export PATH=$LTPROOT/testcases/bin:$PATH',
 			'cd $LTPROOT/testcases/bin',
 		]);
 
-	@tests = backend::read_file($self, "\$LTPROOT/runtest/$runtest") if defined($runtest) && $ret == 0;
-
-	return \@tests;
+    return $ret;
 }
 
 sub reboot
 {
-	my ($self, $reason) = @_;
+	my ($self, $reason, $ltpdir) = @_;
 
 	print("$reason, attempting to reboot...\n");
 	my $ret = backend::reboot($self);
 	return $ret if ($ret != 0);
-	return -1 if (!setup_ltp_run($self));
+	return -1 if (setup_ltp_run($self, $ltpdir) != 0);
 	return 0;
 }
 
@@ -327,9 +366,35 @@ sub check_cmd_retry
 	return $ret != 127;
 }
 
+sub load_tests
+{
+    my ($self, $runtest) = @_;
+
+    if ($runtest =~ "openposix") {
+        my ($ret, @flist) =
+            backend::run_cmd($self, "find \$LTPROOT -name '*.run-test' > /tmp/openposix");
+
+        return backend::read_file($self, '/tmp/openposix');
+    }
+
+    return backend::read_file($self, "\$LTPROOT/runtest/$runtest");
+}
+
+sub parse_test
+{
+    my ($runtest, $line) = @_;
+
+    if ($runtest =~ "openposix") {
+        $line =~ /([-\w]+).run-test/;
+        return ($1, $line);
+    }
+
+    return split(/\s/, $line, 2);
+}
+
 sub run_ltp
 {
-	my ($self, $runtest, $exclude) = @_;
+	my ($self, $ltpdir, $runtest, $exclude) = @_;
 	my @results;
 	my %reshash;
 
@@ -351,14 +416,16 @@ sub run_ltp
 		'warnings' => 0,
 	);
 
-	my $tests = setup_ltp_run($self, $runtest);
+    setup_ltp_run($self, $ltpdir);
+
+	my @tests = load_tests($self, $runtest);
 	my $start_tainted = check_tainted($self);
 	my $start_time = clock_gettime(CLOCK_MONOTONIC);
 
-	for (@$tests) {
+	for (@tests) {
 		next if m/^\s*($|#)/;
 		chomp;
-		my ($tid, $c) = split(/\s/, $_, 2);
+		my ($tid, $c) = parse_test($runtest, $_);
 		next if ($exclude && $tid =~ $exclude);
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
@@ -379,7 +446,11 @@ sub run_ltp
 		$result->{'runtime'} += $test_end_time - $test_start_time;
 		$result->{'runs'} += 1;
 
-		parse_retval($result, \%stats, $ret);
+        if ($runtest =~ "openposix") {
+            parse_retval_openposix($result, \%stats, $ret);
+        } else {
+            parse_retval($result, \%stats, $ret);
+        }
 
 		if (!defined($reshash{$tid})) {
 			push(@results, $result);
@@ -387,13 +458,13 @@ sub run_ltp
 		}
 
 		if (!defined($ret)) {
-			last if (reboot($self, 'Machine stopped respoding') != 0);
+			last if(reboot($self, 'Machine stopped respoding', $ltpdir) != 0);
 		} elsif ($ret) {
 			my $tainted = check_tainted($self);
-                        my $err_msg = defined($tainted) ?
-                            'Kernel was tained' : 'Machine stopped responding';
+            my $err_msg = defined($tainted) ?
+                'Kernel was tained' : 'Machine stopped responding';
 			if ($tainted != $start_tainted) {
-				last if(reboot($self, $err_msg) != 0);
+				last if(reboot($self, $err_msg, $ltpdir) != 0);
 			}
 		}
 	}

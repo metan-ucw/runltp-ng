@@ -36,8 +36,11 @@ my $sysinfo;
 my $verbose;
 my $list;
 my $run;
+my $interactive;
 my $exclude;
+my $ltpdir = '/opt/ltp';
 my $install;
+my $repouri;
 my $setup;
 my $cmd;
 my $m32;
@@ -48,8 +51,11 @@ GetOptions("backend=s" => \$backend_opts,
            "sysinfo" => \$sysinfo,
            "list" => \$list,
            "run=s" => \$run,
+           "interactive" => \$interactive,
            "exclude=s" => \$exclude,
+           "ltpdir=s" => \$ltpdir,
            "install=s" => \$install,
+           "repouri=s" => \$repouri,
            "m32" => \$m32,
 	   "setup" => \$setup,
 	   "cmd=s" => \$cmd,
@@ -64,8 +70,11 @@ if ($help) {
 	print("--list             : List test groups\n\n");
 	print("--verbose          : Enables verbose mode\n\n");
 	print("--run=testgroup    : Execute group of tests\n\n");
+    print("--interactive      : Print command to start interactive session with SUT\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
+    print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
+    print("--repouri=path     : Location of the LTP git repo\n\n");
 	print("--m32              : Build 32bit binaries on 64bit architecture\n\n");
 	print("--setup            : Attempts to set up the machine (installs packages)\n\n");
 	print("--cmd=cmd          : Execute command\n\n");
@@ -85,9 +94,14 @@ if ($sysinfo || $list) {
 		$sysinfo = utils::collect_sysinfo($backend);
 		utils::print_sysinfo($sysinfo);
 	}
-	utils::list_testgroups($backend) if ($list);
+	utils::list_testgroups($backend, $ltpdir) if ($list);
 	backend::stop($backend);
 	exit(0);
+}
+
+if ($interactive) {
+    backend::interactive($backend);
+    exit(0);
 }
 
 backend::set_logfile($backend, "$logname.raw");
@@ -104,17 +118,19 @@ if ($cmd) {
 }
 
 if ($install) {
-	utils::install_ltp($backend, $install, $m32);
-} else {
-	if (!backend::run_cmd($backend, "! [ -e /opt/ltp ]")) {
-		utils::install_ltp($backend, undef, $m32);
-	}
+	utils::install_ltp($backend, $ltpdir, $install, $m32, $run, $repouri);
+}
+
+if (!backend::run_cmd($backend, "! [ -e $ltpdir ]")) {
+    backend::stop($backend);
+    print("LTP dir '$ltpdir' doesn't exist\n");
+    exit(0);
 }
 
 if ($run) {
 	my %results;
 	$results{'sysinfo'} = utils::collect_sysinfo($backend);
-	my ($stats, $test_results) = utils::run_ltp($backend, $run, $exclude);
+	my ($stats, $test_results) = utils::run_ltp($backend, $ltpdir, $run, $exclude);
 	$results{'tests'} = {'stats' => $stats, 'results' => $test_results};
 	results::writelog(\%results, "$logname.json");
 	results::writelog_html(\%results, "$logname.html");

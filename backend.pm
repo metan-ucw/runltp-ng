@@ -207,6 +207,17 @@ sub run_cmds
 	return wantarray? @log : 0;
 }
 
+sub interactive
+{
+    my ($self) = @_;
+
+    if (defined($self->{'interactive'})) {
+        msg('Run: ' . $self->{'interactive'}->($self) . "\n");
+    } else {
+        msg("Interactive not implemented for $self->{'name'}\n");
+    }
+}
+
 sub start
 {
 	my ($self) = @_;
@@ -229,7 +240,7 @@ sub serial_relay_force_stop
 
 	my $port = $self->{'serial_relay_port'};
 
-	msg("Resetting machine backend $self->{'backend_name'} serial relay port $port\n");
+	msg("Resetting machine backend $self->{'name'} serial relay port $port\n");
 
 	open(my $fh, '<', $port);
 	sleep(0.1);
@@ -286,10 +297,17 @@ sub qemu_read_file
 	return @lines;
 }
 
+sub qemu_cmdline
+{
+    my ($self) = @_;
+
+    return "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
+}
+
 sub qemu_start
 {
 	my ($self) = @_;
-	my $cmdline = "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
+	my $cmdline = qemu_cmdline($self);
 
 	msg("Starting qemu with: $cmdline\n");
 
@@ -322,6 +340,10 @@ sub qemu_start
 	run_string($self, "$self->{'root_password'}");
 	wait_prompt($self);
 	run_string($self, "export PS1=\$ ");
+
+    if (defined($self->{'qemu_virtfs'})) {
+        run_cmd($self, 'mount -t 9p -o trans=virtio host /mnt');
+    }
 }
 
 sub qemu_stop
@@ -348,7 +370,7 @@ sub qemu_stop
 	msg("Failed to stop qemu, killing it!\n");
 
 	kill('TERM', $self->{'pid'});
-	waitpid($self->{'pid'}, 0);
+	return waitpid($self->{'pid'}, 0) < 0 ? -1 : 0
 }
 
 sub print_help
@@ -397,6 +419,7 @@ my $qemu_params = [
 	['system', 'qemu_system', 'Qemu system such as x86_64'],
 	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
 	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
+    ['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
 ];
 
 sub qemu_init
@@ -418,12 +441,21 @@ sub qemu_init
 
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
 
-	$backend{'qemu_params'} .= ' -hda ' . $backend{'qemu_image'};
+	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
 
 	if (defined($backend{'qemu_opts'})) {
 		$backend{'qemu_params'} .= ' ' . $backend{'qemu_opts'};
 	}
 
+    if (defined($backend{'qemu_virtfs'})) {
+        $backend{'qemu_params'} .= ' -virtfs local' .
+            ',path=' . $backend{'qemu_virtfs'} .
+            ',mount_tag=host' .
+            ',security_model=mapped-xattr' .
+            ',readonly';
+    }
+
+    $backend{'interactive'} = \&qemu_cmdline;
 	$backend{'start'} = \&qemu_start;
 	$backend{'stop'} = \&qemu_stop;
 	$backend{'force_stop'} = \&qemu_stop;
@@ -600,7 +632,7 @@ sub new
 	my @backend_params = quotewords(':', 0, $opts);
 	my $backend_type = shift @backend_params;
 
-	msg("Running test with $backend_type parameters '@backend_params'\n");
+	msg("Using $backend_type backend; parameters '@backend_params'\n");
 
 	for (@backends) {
 		return $_->[2]->(@backend_params) if ($_->[0] eq $backend_type);
