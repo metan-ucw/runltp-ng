@@ -2,6 +2,7 @@ perl_src = 	$(wildcard *.pm)\
 		runltp-ng
 
 define check_perl_file
+    perl -I . -c $(1)
     perlcritic -p .perlcriticrc $(1)
     perltidy --pro=.perltidyrc $(1)
     diff $(1) $(1).tdy
