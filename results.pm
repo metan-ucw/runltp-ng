@@ -248,7 +248,7 @@ my $html_header = "<html>
    <h1>LTP Results</h1>";
 
 
-my $html_footer="</center>
+my $html_footer = "</center>
   </div>
   <script type=\"text/javascript\">
    var table = document.getElementById(\"results\");
@@ -299,7 +299,7 @@ sub write_runtime
 
 	if ($runtime / 60 >= 1) {
 		use integer;
-		$min = $runtime/60;
+		$min = $runtime / 60;
 		print($fh "${min}m ");
 	}
 
@@ -318,10 +318,10 @@ sub write_stats
 	print($fh "    <tr>\n");
 	print($fh "     <th colspan=\"6\" style=\"text-align: center\">Overall results</th>\n");
 	print($fh "    </tr>\n");
-        print($fh "    <tr>\n");
+	print($fh "    <tr>\n");
 	print($fh "     <td class=\"rtime\">Runtime: ");
 	write_runtime($fh, $stats->{'runtime'});
-        print($fh "</td>\n");
+	print($fh "</td>\n");
 	print($fh "     <td class=\"pass\">Passed: $stats->{'passed'}</td>\n");
 	print($fh "     <td class=\"skip\">Skipped: $stats->{'skipped'}</td>\n");
 	print($fh "     <td class=\"fail\">Failed: $stats->{'failed'}</td>\n");
@@ -356,7 +356,7 @@ sub write_results
 
 	printf($fh "    <table id=\"results\" style=\"cursor: pointer\">\n");
 	printf($fh "     <tr>\n");
-        printf($fh "      <th onclick=\"sort_by(0)\" class=\"id\">Test ID &#8597;</th>\n");
+	printf($fh "      <th onclick=\"sort_by(0)\" class=\"id\">Test ID &#8597;</th>\n");
 	printf($fh "      <th onclick=\"sort_by(1)\">Runs &#8597;</th>\n");
 	printf($fh "      <th onclick=\"sort_by(2)\">Runtime &#8597;</th>\n");
 	printf($fh "      <th onclick=\"sort_by(3)\">Passes &#8597;</th>\n");
@@ -389,7 +389,7 @@ sub write_results
 
 		print($fh "      <td>");
 		write_runtime($fh, $_->{'runtime'});
-                print($fh "</td>\n");
+		print($fh "</td>\n");
 
 		print($fh "      <td>$_->{'passed'}</td>\n");
 		print($fh "      <td>$_->{'skipped'}</td>\n");
@@ -397,12 +397,12 @@ sub write_results
 		print($fh "      <td>$_->{'broken'}</td>\n");
 		print($fh "      <td>$_->{'warnings'}</td>\n");
 		print($fh "     </tr>\n");
-                print($fh "     <tr class=\"logs hidden3\">\n");
-                print($fh "      <td class=\"logs\" colspan=\"8\">\n");
+		print($fh "     <tr class=\"logs hidden3\">\n");
+		print($fh "      <td class=\"logs\" colspan=\"8\">\n");
 		print($fh "       <pre>\n");
 		print($fh html_escape($_) . "\n") for (@{$_->{'log'}});
 		print($fh "       </pre>\n");
-                print($fh "      </td>\n");
+		print($fh "      </td>\n");
 		print($fh "     </tr>\n");
 	}
 }

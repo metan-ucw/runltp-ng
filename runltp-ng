@@ -46,21 +46,21 @@ my $cmd;
 my $m32;
 
 GetOptions("backend=s" => \$backend_opts,
-           "help" => \$help,
-           "logname=s" => \$logname,
-           "sysinfo" => \$sysinfo,
-           "list" => \$list,
-           "run=s" => \$run,
-           "interactive" => \$interactive,
-           "exclude=s" => \$exclude,
-           "ltpdir=s" => \$ltpdir,
-           "install=s" => \$install,
-           "repouri=s" => \$repouri,
-           "m32" => \$m32,
-	   "setup" => \$setup,
-	   "cmd=s" => \$cmd,
-           "verbose" => \$verbose)
-or die("Error in argument parsing!\n");
+	"help" => \$help,
+	"logname=s" => \$logname,
+	"sysinfo" => \$sysinfo,
+	"list" => \$list,
+	"run=s" => \$run,
+	"interactive" => \$interactive,
+	"exclude=s" => \$exclude,
+	"ltpdir=s" => \$ltpdir,
+	"install=s" => \$install,
+	"repouri=s" => \$repouri,
+	"m32" => \$m32,
+	"setup" => \$setup,
+	"cmd=s" => \$cmd,
+	"verbose" => \$verbose)
+	or die("Error in argument parsing!\n");
 
 if ($help) {
 	print("Options\n-------\n\n");
@@ -70,11 +70,11 @@ if ($help) {
 	print("--list             : List test groups\n\n");
 	print("--verbose          : Enables verbose mode\n\n");
 	print("--run=testgroup    : Execute group of tests\n\n");
-    print("--interactive      : Print command to start interactive session with SUT\n\n");
+	print("--interactive      : Print command to start interactive session with SUT\n\n");
 	print("--exclude=regex    : Exclude tests from test group\n\n");
-    print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
+	print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
-    print("--repouri=path     : Location of the LTP git repo\n\n");
+	print("--repouri=path     : Location of the LTP git repo\n\n");
 	print("--m32              : Build 32bit binaries on 64bit architecture\n\n");
 	print("--setup            : Attempts to set up the machine (installs packages)\n\n");
 	print("--cmd=cmd          : Execute command\n\n");
@@ -100,8 +100,8 @@ if ($sysinfo || $list) {
 }
 
 if ($interactive) {
-    backend::interactive($backend);
-    exit(0);
+	backend::interactive($backend);
+	exit(0);
 }
 
 backend::set_logfile($backend, "$logname.raw");
@@ -122,9 +122,9 @@ if ($install) {
 }
 
 if (!backend::run_cmd($backend, "! [ -e $ltpdir ]")) {
-    backend::stop($backend);
-    print("LTP dir '$ltpdir' doesn't exist\n");
-    exit(0);
+	backend::stop($backend);
+	print("LTP dir '$ltpdir' doesn't exist\n");
+	exit(0);
 }
 
 if ($run) {
