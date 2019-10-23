@@ -394,7 +394,7 @@ sub parse_test
 
 sub run_ltp
 {
-	my ($self, $ltpdir, $runtest, $exclude) = @_;
+	my ($self, $ltpdir, $runtest, $exclude, $timeout) = @_;
 	my @results;
 	my %reshash;
 
@@ -429,7 +429,7 @@ sub run_ltp
 		next if ($exclude && $tid =~ $exclude);
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
-		my ($ret, @log) = backend::run_cmd($self, "$c", 600);
+		my ($ret, @log) = backend::run_cmd($self, "$c", $timeout);
 		my $test_end_time = clock_gettime(CLOCK_MONOTONIC);
 
 		my $result = {};

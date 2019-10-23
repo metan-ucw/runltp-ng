@@ -227,11 +227,11 @@ sub start
 
 sub stop
 {
-	my ($self) = @_;
+	my ($self, $timeout) = @_;
 
 	close($self->{'raw_logfile'}) if defined($self->{'raw_logfile'});
 
-	$self->{'stop'}->($self) if defined($self->{'stop'});
+	$self->{'stop'}->($self, $timeout) if defined($self->{'stop'});
 }
 
 sub serial_relay_force_stop
@@ -348,7 +348,7 @@ sub qemu_start
 
 sub qemu_stop
 {
-	my ($self) = @_;
+	my ($self, $timeout) = @_;
 
 	close($self->{'transport'}) if defined($self->{'transport'});
 
@@ -357,8 +357,6 @@ sub qemu_stop
 	msg("Stopping qemu pid $self->{'pid'}\n");
 
 	run_string($self, "poweroff");
-
-	my $timeout = 600;
 
 	while ($timeout > 0) {
 		return if waitpid($self->{'pid'}, WNOHANG);
