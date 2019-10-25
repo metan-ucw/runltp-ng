@@ -309,6 +309,14 @@ sub qemu_start
 	my ($self) = @_;
 	my $cmdline = qemu_cmdline($self);
 
+	if (defined($self->{'qemu_image_overlay'})) {
+		my $ret = system('qemu-img', 'create', '-f', 'qcow2',
+				 '-b', $self->{'qemu_image_backing'},
+				 $self->{'qemu_image'});
+
+		$ret == 0 || die("Failed to create image overlay: $?");
+	}
+
 	msg("Starting qemu with: $cmdline\n");
 
 	unlink($self->{'transport_fname'});
@@ -412,6 +420,7 @@ sub parse_params
 
 my $qemu_params = [
 	['image', 'qemu_image', 'Path to bootable qemu image'],
+	['image-overlay', 'qemu_image_overlay', 'If set, an image overlay is created before each boot and changes are written to that instead of the original'],
 	['password', 'root_password', 'Qemu image root password'],
 	['opts', 'qemu_opts', 'Additional qemu command line options'],
 	['system', 'qemu_system', 'Qemu system such as x86_64'],
@@ -438,6 +447,11 @@ sub qemu_init
 	$backend{'qemu_system'} = 'x86_64';
 
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
+
+	if (defined($backend{'qemu_image_overlay'})) {
+		$backend{'qemu_image_backing'} = $backend{'qemu_image'};
+		$backend{'qemu_image'} .= '.overlay';
+	}
 
 	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
 
