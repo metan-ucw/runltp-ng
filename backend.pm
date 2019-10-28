@@ -249,10 +249,10 @@ sub serial_relay_force_stop
 
 sub force_stop
 {
-	my ($self) = @_;
+	my ($self, $timeout) = @_;
 
 	if (defined($self->{'force_stop'})) {
-		return $self->{'force_stop'}->($self);
+		return $self->{'force_stop'}->($self, $timeout);
 	} else {
 		print("Backend $self->{'name'} has to be force stopped manually\n");
 		print("Please bring the machine into usable state and then press any key\n");
@@ -261,11 +261,11 @@ sub force_stop
 	return 0;
 }
 
-sub reboot
+sub reboot($$)
 {
-	my ($self) = @_;
+	my ($self, $timeout) = @_;
 
-	my $ret = force_stop($self);
+	my $ret = force_stop($self, $timeout);
 	return $ret if ($ret != 0);
 	$ret = start($self);
 	return $ret;
@@ -354,7 +354,7 @@ sub qemu_start
 	}
 }
 
-sub qemu_stop
+sub qemu_stop($$)
 {
 	my ($self, $timeout) = @_;
 

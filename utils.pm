@@ -283,10 +283,9 @@ sub check_tainted
 	return $res;
 }
 
-sub setup_ltp_run
+sub setup_ltp_run($$$)
 {
-	my ($self, $ltpdir, $runtest) = @_;
-	my @tests;
+	my ($self, $ltpdir, $timeout) = @_;
 
 	my $ret = utils::run_cmds_retry($self,
 		[
@@ -294,21 +293,20 @@ sub setup_ltp_run
 			'export LTPROOT=$PWD',
 			'export TMPDIR=/tmp',
 			'export PATH=$LTPROOT/testcases/bin:$PATH',
+			'export LTP_TIMEOUT_MUL=' . ($timeout * 0.9) / 300,
 			'cd $LTPROOT/testcases/bin',
 		]);
 
 	return $ret;
 }
 
-sub reboot
+sub reboot($$$)
 {
-	my ($self, $reason, $ltpdir) = @_;
+	my ($self, $reason, $timeout) = @_;
 
 	print("$reason, attempting to reboot...\n");
-	my $ret = backend::reboot($self);
-	return $ret if ($ret != 0);
-	return -1 if (setup_ltp_run($self, $ltpdir) != 0);
-	return 0;
+
+	return backend::reboot($self, $timeout);
 }
 
 
@@ -327,11 +325,12 @@ The function returns a array of hash refs or the exitcode of the last command in
 	...
   )
 =cut
-sub run_cmds_retry
+sub run_cmds_retry($$%)
 {
 	my ($self, $cmd, %args) = @_;
 	my @ret;
 	$args{retries} //= 3;
+	$args{timeout} //= 3600;
 
 	for my $cnt (1 .. $args{retries}) {
 		@ret = backend::run_cmds($self, $cmd, %args);
@@ -340,7 +339,7 @@ sub run_cmds_retry
 			die("Unable to recover SUT");
 		}
 		my $reboot_msg = "Timeout on command: " . $ret[$#ret]->{cmd};
-		my $reboot_ret = reboot($self, $reboot_msg);
+		my $reboot_ret = reboot($self, $reboot_msg, $args{timeout});
 		if ($reboot_ret != 0) {
 			push(@ret, {cmd => 'reboot-sut', ret => $reboot_ret, log => $reboot_msg});
 			last;
@@ -352,7 +351,7 @@ sub run_cmds_retry
 	wantarray ? @ret : $ret[$#ret]->{ret};
 }
 
-sub run_cmd_retry
+sub run_cmd_retry($$%)
 {
 	my ($self, $cmd, %args) = @_;
 	my ($ret) = run_cmds_retry($self, [$cmd], %args);
@@ -394,7 +393,7 @@ sub parse_test
 
 sub run_ltp
 {
-	my ($self, $ltpdir, $runtest, $exclude, $timeout) = @_;
+	my ($self, $ltpdir, $runtest, $timeout, $include, $exclude) = @_;
 	my @results;
 	my %reshash;
 
@@ -416,7 +415,7 @@ sub run_ltp
 		'warnings' => 0,
 	);
 
-	setup_ltp_run($self, $ltpdir);
+	setup_ltp_run($self, $ltpdir, $timeout);
 
 	my @tests = load_tests($self, $runtest);
 	my $start_tainted = check_tainted($self);
@@ -425,8 +424,11 @@ sub run_ltp
 	for (@tests) {
 		next if m/^\s*($|#)/;
 		chomp;
+
 		my ($tid, $c) = parse_test($runtest, $_);
+		next unless ($tid =~ $include);
 		next if ($exclude && $tid =~ $exclude);
+
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
 		my ($ret, @log) = backend::run_cmd($self, "$c", $timeout);
@@ -457,15 +459,17 @@ sub run_ltp
 			$reshash{$tid} = $result;
 		}
 
-		if (!defined($ret)) {
-			last if (reboot($self, 'Machine stopped respoding', $ltpdir) != 0);
-		} elsif ($ret) {
+		my $err_msg = 'Machine stopped respoding';
+		if (defined($ret)) {
+			next if ($ret == 0);
+
 			my $tainted = check_tainted($self);
-			my $err_msg = defined($tainted) ? 'Kernel was tained' : 'Machine stopped responding';
-			if ($tainted != $start_tainted) {
-				last if (reboot($self, $err_msg, $ltpdir) != 0);
-			}
+			next if ($tainted == $start_tainted);
+			$err_msg = 'Kernel was tained' if (defined($tainted));
 		}
+
+		last if (reboot($self, $err_msg, $timeout) != 0);
+		last if (setup_ltp_run($self, $ltpdir, $timeout) != 0);
 	}
 
 	my $stop_time = clock_gettime(CLOCK_MONOTONIC);
