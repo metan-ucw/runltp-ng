@@ -207,14 +207,14 @@ sub run_cmds
 	return wantarray ? @log : 0;
 }
 
-sub interactive
+sub interactive($)
 {
 	my ($self) = @_;
 
 	if (defined($self->{'interactive'})) {
-		msg('Run: ' . $self->{'interactive'}->($self) . "\n");
+		msg(0, 'Run: ' . $self->{'interactive'}->($self) . "\n");
 	} else {
-		msg("Interactive not implemented for $self->{'name'}\n");
+		msg(0, "Interactive not implemented for $self->{'name'}\n");
 	}
 }
 
