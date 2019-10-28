@@ -271,19 +271,21 @@ sub reboot($$)
 	return $ret;
 }
 
-sub qemu_read_file
+sub qemu_read_file($$)
 {
 	my ($self, $path) = @_;
+	my @lines;
 
 	if (run_cmd($self, "cat \"$path\" > /dev/ttyS1")) {
-		die("Failed to write file to ttyS1");
+		msg("Failed to write file to ttyS1");
+		return @lines;
 	}
 
 	if (run_cmd($self, 'echo "runltp-ng-magic-end-of-file-string" > /dev/ttyS1')) {
-		die("Failed to write to ttyS1");
+		msg("Failed to write to ttyS1");
+		return @lines;
 	}
 
-	my @lines;
 	my $fh = $self->{'transport'};
 
 	while (1) {
