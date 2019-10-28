@@ -38,6 +38,7 @@ my $list;
 my $run;
 my $interactive;
 my $exclude;
+my $include = '.*';
 my $ltpdir = '/opt/ltp';
 my $install;
 my $repouri;
@@ -55,6 +56,7 @@ GetOptions(
 	"run=s" => \$run,
 	"interactive" => \$interactive,
 	"exclude=s" => \$exclude,
+	"include=s" => \$include,
 	"ltpdir=s" => \$ltpdir,
 	"install=s" => \$install,
 	"repouri=s" => \$repouri,
@@ -74,7 +76,8 @@ if ($help) {
 	print("--verbose          : Enables verbose mode\n\n");
 	print("--run=testgroup    : Execute group of tests\n\n");
 	print("--interactive      : Print command to start interactive session with SUT\n\n");
-	print("--exclude=regex    : Exclude tests from test group\n\n");
+	print("--include=regex    : Include tests from test group which match regex (default '.*')\n\n");
+	print("--exclude=regex    : Exclude tests from test group which match regex\n\n");
 	print("--ltpdir=path      : Directroy where LTP is, or will be, installed (default /opt/ltp)\n\n");
 	print("--install=hash/tag : Checkout LTP from git, compile it and install\n\n");
 	print("--repouri=path     : Location of the LTP git repo\n\n");
@@ -134,7 +137,9 @@ if (!backend::run_cmd($backend, "! [ -e $ltpdir ]", $timeout)) {
 if ($run) {
 	my %results;
 	$results{'sysinfo'} = utils::collect_sysinfo($backend);
-	my ($stats, $test_results) = utils::run_ltp($backend, $ltpdir, $run, $exclude, $timeout);
+	my ($stats, $test_results) =
+	    utils::run_ltp($backend, $ltpdir, $run, $timeout,
+			   $include, $exclude);
 	$results{'tests'} = {'stats' => $stats, 'results' => $test_results};
 	results::writelog(\%results, "$logname.json");
 	results::writelog_html(\%results, "$logname.html");
