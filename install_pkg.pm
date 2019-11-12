@@ -60,7 +60,7 @@ sub detect_distro
 	if (utils::run_cmd_retry($self, 'grep -q debian /etc/os-release') == 0) {
 		return "debian";
 	}
-	if (utils::run_cmd_retry($self, 'grep -q opensuse /etc/os-release') == 0) {
+	if (utils::run_cmd_retry($self, 'grep -q suse /etc/os-release') == 0) {
 		return "suse";
 	}
 
