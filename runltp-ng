@@ -95,6 +95,12 @@ log::set_verbosity(1) if ($verbose);
 
 my $backend = backend::new($backend_opts);
 
+sub stop_exit($)
+{
+	backend::stop($backend, $timeout);
+	exit(shift);
+}
+
 if ($sysinfo || $list) {
 	backend::start($backend);
 	if ($sysinfo) {
@@ -102,8 +108,7 @@ if ($sysinfo || $list) {
 		utils::print_sysinfo($sysinfo);
 	}
 	utils::list_testgroups($backend, $ltpdir) if ($list);
-	backend::stop($backend, $timeout);
-	exit(0);
+	stop_exit(0);
 }
 
 if ($interactive) {
@@ -114,9 +119,8 @@ if ($interactive) {
 backend::set_logfile($backend, "$logname.raw");
 backend::start($backend);
 
-if ($setup) {
-	install_pkg::install_ltp_pkgs($backend, $m32);
-	exit(0);
+if ($setup && install_pkg::install_ltp_pkgs($backend, $m32)) {
+	stop_exit(0);
 }
 
 if ($cmd) {
@@ -124,14 +128,13 @@ if ($cmd) {
 	print("$_\n") for (@result);
 }
 
-if ($install) {
-	utils::install_ltp($backend, $ltpdir, $install, $m32, $run, $repouri);
+if ($install && utils::install_ltp($backend, $ltpdir, $install, $m32, $run, $repouri)) {
+	stop_exit(0);
 }
 
 if (!backend::run_cmd($backend, "! [ -e $ltpdir ]", $timeout)) {
-	backend::stop($backend, $timeout);
 	print("LTP dir '$ltpdir' doesn't exist\n");
-	exit(0);
+	stop_exit(0);
 }
 
 if ($run) {
