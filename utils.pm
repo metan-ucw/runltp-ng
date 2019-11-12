@@ -166,6 +166,8 @@ sub install_ltp
 	push(@cmds, 'make autotools');
 	if (defined($runtest) && $runtest =~ "openposix") {
 		push(@cmds, "./configure --prefix=$ltpdir --with-open-posix-testsuite");
+	} elsif (defined($runtest) && $runtest =~ "syzkaller") {
+		push(@cmds, "./configure --prefix=$ltpdir --with-syzkaller-repros");
 	} else {
 		push(@cmds, "./configure --prefix=$ltpdir");
 	}
