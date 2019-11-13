@@ -70,7 +70,7 @@ sub detect_distro
 
 sub pkg_to_m32
 {
-	my ($self, $distro, $pkg_name) = @_;
+	my ($distro, $pkg_name) = @_;
 
 	if ($distro eq "debian") {
 		#TODO: we need architecture detection for now default to i386
