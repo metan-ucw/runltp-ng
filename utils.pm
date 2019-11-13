@@ -148,9 +148,6 @@ sub install_ltp
 
 	$uri //= 'http://github.com/linux-test-project/ltp.git';
 
-	$ret = install_pkg::install_ltp_pkgs($self, $m32);
-	return $ret if ($ret);
-
 	my @cmds = ();
 
 	push(@cmds, "if [ -e $ltpdir ]; then rm -rf $ltpdir; fi");
