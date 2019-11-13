@@ -1,3 +1,95 @@
+Runltp-ng
+=========
+
+This installs and runs the Linux Test Project on a system in a virtual machine
+or a remote system over SSH. You specify which tests you want to run, the
+details of the system under test (SUT) and it does the rest.
+
+Unlike the original runltp script, this does not execute on the SUT. It runs
+on a seperate host which controls the SUT.
+
+Quickstart
+==========
+
+You can get help with `./runltp --help`.
+
+QEMU
+----
+
+First you need a VM image which boots without user input and starts a serial
+terminal on ttyS0 (See Grub section below).
+
+For Debian and SUSE atleast you may automatically install LTP by doing
+something like the following.
+
+```
+$ ./runltp --verbose --setup --install=mybranch --repouri=/mnt/ltp\
+           --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/local:password=123\
+```
+
+This assums you have a local checkout of the LTP at `/local/ltp` with a branch
+`mybranch`. The `virtfs` backend option will cause `/local` to be mounted on
+the virtual machine at `/mnt` (as read-only).
+
+The `--setup` option will try to install the required packages for building
+the LTP before trying to clone/download and build it.
+
+The `--install` option specifies which branch to install. If Git is present,
+then it will try to do a git clone otherwise it will try to guess the archive
+location and download that. `--repouri` can be a local or remote Git
+repository or omitted to use the main repo.
+
+The `--verbose` flag causes the SUTs serial I/O to be printed to stdout as
+well as other info. Otherwise this information is just available in the
+logs.
+
+If you want the OpenPOSIX test suite or the Syzkaller reproducers to be
+installed then you could do something like.
+
+```
+$ ./runltp --run=syzkaller --install=master\
+           --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:password=123\
+```
+
+This will also try to run a runtest file called syzkaller, but no such file
+exists. To run the tests:
+
+```
+$ ./runltp-ng --run=syzkaller1 --timeout=20\
+              --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:password=123:image-overlay=1 
+```
+
+This will run the tests with an overall timeout of 20 seconds (usually it is
+300+). The backend option `image-overlay=1` means that all changes to the VM
+image during execution are written to a temporary image overlay which is
+recreated if the runner is forced to reboot the SUT.
+
+Sometimes you can skip installation altogether and just run tests from your
+host machine.
+
+```
+$ ./runltp --run=syscalls --ltpdir=/mnt\
+           --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/opt/ltp:password=123
+```
+
+This assumes you have the LTP installed in `/opt/ltp` on your host and the
+guest and host share the same version of libc (or you compiled LTP with static
+linking).
+
+You can also run a single command.
+
+```
+$ ./runltp --cmd=/mnt/testcases/kernel/systemcalls/bpf/bpf_prog02\
+           --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/home/me/ltp:password=123
+```
+
+The option `--cmd` just specifies some text to pass to the shell. If used with
+`--run` then it is executed before the tests.
+
+Once you have executed `runltp` a number of log files will be written to its
+directory. These include the raw serial output and a HTML report amongst other
+things.
+
 Kernel automation cookbook
 ==========================
 
