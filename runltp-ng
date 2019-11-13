@@ -119,7 +119,7 @@ if ($interactive) {
 backend::set_logfile($backend, "$logname.raw");
 backend::start($backend);
 
-if ($setup && install_pkg::install_ltp_pkgs($backend, $m32)) {
+if ($setup && install_pkg::install_ltp_pkgs($backend, $m32 || $run =~ "syzkaller")) {
 	stop_exit(0);
 }
 
