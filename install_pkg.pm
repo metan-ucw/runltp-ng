@@ -106,7 +106,7 @@ sub install_pkg
 		return 'apt-get install -y ' . join(' ', @pkgs);
 
 	} elsif ($distro eq 'suse') {
-		return 'zypper --non-interactive in ' . join(' ', @pkgs);
+		return 'zypper --non-interactive --ignore-unknown in ' . join(' ', @pkgs);
 	}
 	return;
 }
@@ -119,6 +119,11 @@ sub update_pkg_db
 	if ($distro eq "debian") {
 		return "apt-get update";
 	}
+
+	if ($distro eq "suse") {
+		return "zypper --non-interactive ref";
+	}
+
 	return;
 }
 
