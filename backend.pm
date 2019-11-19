@@ -306,18 +306,33 @@ sub qemu_cmdline
 	return "qemu-system-$self->{'qemu_system'} $self->{'qemu_params'}";
 }
 
+sub qemu_create_overlay
+{
+	my ($self) = @_;
+
+	my $ret = system('qemu-img', 'create', '-f', 'qcow2',
+			 '-b', $self->{'qemu_image_backing'},
+			 $self->{'qemu_image'});
+
+	$ret == 0 || die("Failed to create image overlay: $?");
+}
+
+sub qemu_interactive($)
+{
+	my ($self) = @_;
+	my $cmdline = qemu_cmdline($self);
+
+	msg("Starting qemu with: $cmdline\n");
+	$self->qemu_create_overlay() if (defined($self->{'qemu_image_overlay'}));
+	exec $cmdline || die("Failed to exec QEMU: $?");
+}
+
 sub qemu_start
 {
 	my ($self) = @_;
 	my $cmdline = qemu_cmdline($self);
 
-	if (defined($self->{'qemu_image_overlay'})) {
-		my $ret = system('qemu-img', 'create', '-f', 'qcow2',
-				 '-b', $self->{'qemu_image_backing'},
-				 $self->{'qemu_image'});
-
-		$ret == 0 || die("Failed to create image overlay: $?");
-	}
+	$self->qemu_create_overlay() if (defined($self->{'qemu_image_overlay'}));
 
 	msg("Starting qemu with: $cmdline\n");
 
@@ -429,6 +444,7 @@ my $qemu_params = [
 	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
 	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
 	['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
+	['ro-image', 'qemu_ro_image', 'Path to an image which will be exposed as read only']
 ];
 
 sub qemu_init
@@ -444,7 +460,7 @@ sub qemu_init
 	$smp = $backend{'qemu_smp'} if (defined($backend{'qemu_smp'}));
 
 	$backend{'transport_fname'} = $transport_fname;
-	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none -serial stdio";
+	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display curses -serial stdio";
 	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
 	$backend{'qemu_system'} = 'x86_64';
 
@@ -456,6 +472,10 @@ sub qemu_init
 	}
 
 	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
+	if (defined($backend{'qemu_ro_image'})) {
+		$backend{'qemu_params'} .= ' -drive read-only,if=virtio,cache=unsafe,file='
+		    . $backend{'qemu_ro_image'};
+	}
 
 	if (defined($backend{'qemu_opts'})) {
 		$backend{'qemu_params'} .= ' ' . $backend{'qemu_opts'};
@@ -469,7 +489,7 @@ sub qemu_init
 			',readonly';
 	}
 
-	$backend{'interactive'} = \&qemu_cmdline;
+	$backend{'interactive'} = \&qemu_interactive;
 	$backend{'start'} = \&qemu_start;
 	$backend{'stop'} = \&qemu_stop;
 	$backend{'force_stop'} = \&qemu_stop;
