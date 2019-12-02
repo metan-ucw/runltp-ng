@@ -451,6 +451,7 @@ sub qemu_init
 {
 	my %backend;
 	my $transport_fname = "transport-" . getppid();
+	my $tty_log = "ttyS0-" . getppid();
 	my $ram = "1.5G";
 	my $smp = 2;
 
@@ -461,7 +462,7 @@ sub qemu_init
 
 	$backend{'transport_fname'} = $transport_fname;
 	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none";
-	$backend{'qemu_params'} .= " -chardev stdio,id=ttyS0,logfile=ttyS0.log -serial chardev:ttyS0";
+	$backend{'qemu_params'} .= " -chardev stdio,id=ttyS0,logfile=$tty_log.log -serial chardev:ttyS0";
 	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
 	$backend{'qemu_system'} = 'x86_64';
 
