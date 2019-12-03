@@ -323,7 +323,7 @@ sub qemu_interactive($)
 	my $cmdline = qemu_cmdline($self);
 
 	msg("Starting qemu with: $cmdline\n");
-	$self->qemu_create_overlay() if (defined($self->{'qemu_image_overlay'}));
+	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
 	exec $cmdline || die("Failed to exec QEMU: $?");
 }
 
@@ -332,7 +332,7 @@ sub qemu_start
 	my ($self) = @_;
 	my $cmdline = qemu_cmdline($self);
 
-	$self->qemu_create_overlay() if (defined($self->{'qemu_image_overlay'}));
+	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
 
 	msg("Starting qemu with: $cmdline\n");
 
