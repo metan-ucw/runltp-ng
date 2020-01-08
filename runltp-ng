@@ -45,7 +45,7 @@ my $repouri;
 my $setup;
 my $cmd;
 my $m32;
-my $timeout = 330;
+my $timeout = 334;
 
 GetOptions(
 	"backend=s" => \$backend_opts,
