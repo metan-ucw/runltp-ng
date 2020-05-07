@@ -31,6 +31,7 @@ sub foo_to_pkg
 		'unzip' => 'unzip',
 		'autoconf' => 'autoconf',
 		'automake' => 'automake',
+		'pkg-config' => 'pkg-config',
 		'make' => 'make',
 		'gcc' => 'gcc',
 
@@ -135,7 +136,7 @@ sub install_ltp_pkgs
 	return unless defined($distro);
 
 	# Attempt to install required packages
-	my @required_pkgs = ('make', 'autoconf', 'automake', 'gcc');
+	my @required_pkgs = ('make', 'autoconf', 'automake', 'pkg-config', 'gcc');
 
 	# We need at least one
 	push(@required_pkgs, 'git');
