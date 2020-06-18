@@ -17,7 +17,7 @@ QEMU
 ----
 
 First you need a VM image which boots without user input and starts a serial
-terminal on ttyS0 (See Grub section below).
+terminal (See Grub section below).
 
 For Debian and SUSE atleast you may automatically install LTP by doing
 something like the following.
@@ -178,21 +178,25 @@ plus git in order to download and compile the LTP.
 
 The qemu backend runs the testcases inside of an virtual machine. The
 testrunner expects that the machine is configured to start a console on a first
-serial port (console=ttyS0 on x86 kernel command line), the path to the virtual
-machine harddisk image as well as root password has to be specified on the
-command line. Older distributions may need getty enabled in /etc/inittab as
-well so that we can log in on the serial console.
+serial port (console=ttyS0 on x86 kernel command line, or console=hvc0 if the
+serial=virtio option is given), the path to the virtual machine harddisk image
+as well as root password has to be specified on the command line. Older
+distributions may need getty enabled in /etc/inittab as well so that we can log
+in on the serial console.
 
 The force reboot is implemented by killing the qemu process and does not
 require any user specific setup.
 
 #### GRUB2 configuration
 
-To enable console on ttyS0 for a VM do:
+To enable console on a tty device for a VM do:
 
 * open /etc/default/grub
-* add "console=ttyS0, console=tty0"  to 'GRUB\_CMDLINE\_LINUX'
+* add "console=$tty\_name, console=tty0"  to 'GRUB\_CMDLINE\_LINUX'
 * run grub-mkconfig -o /boot/grub/grub.cfg
+
+Where `$tty_name` should be `ttyS0`, unless virtio serial type is used (i.e.
+if you set the `serial=virtio` backend option, then use `hvc0`)
 
 ### SSH backend
 
