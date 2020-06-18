@@ -464,6 +464,7 @@ sub qemu_init
 	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none";
 	$backend{'qemu_params'} .= " -chardev stdio,id=ttyS0,logfile=$tty_log.log -serial chardev:ttyS0";
 	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
+	$backend{'qemu_params'} .= " -device virtio-rng-pci";
 	$backend{'qemu_system'} = 'x86_64';
 
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
