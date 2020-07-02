@@ -384,7 +384,7 @@ sub qemu_stop($$)
 	run_string($self, "poweroff");
 
 	while ($timeout > 0) {
-		return if waitpid($self->{'pid'}, WNOHANG);
+		return 0 if waitpid($self->{'pid'}, WNOHANG);
 		sleep(1);
 		$timeout -= 1;
 		#flush($self);
