@@ -276,13 +276,13 @@ sub qemu_read_file($$)
 	my ($self, $path) = @_;
 	my @lines;
 
-	if (run_cmd($self, "cat \"$path\" > /dev/ttyS1")) {
-		msg("Failed to write file to ttyS1");
+	if (run_cmd($self, "cat \"$path\" > /dev/$self->{'transport_dev'}")) {
+		msg("Failed to write file to $self->{'transport_dev'}");
 		return @lines;
 	}
 
-	if (run_cmd($self, 'echo "runltp-ng-magic-end-of-file-string" > /dev/ttyS1')) {
-		msg("Failed to write to ttyS1");
+	if (run_cmd($self, "echo 'runltp-ng-magic-end-of-file-string' > /dev/$self->{'transport_dev'}")) {
+		msg("Failed to write to $self->{'transport_dev'}");
 		return @lines;
 	}
 
@@ -384,7 +384,7 @@ sub qemu_stop($$)
 	run_string($self, "poweroff");
 
 	while ($timeout > 0) {
-		return if waitpid($self->{'pid'}, WNOHANG);
+		return 0 if waitpid($self->{'pid'}, WNOHANG);
 		sleep(1);
 		$timeout -= 1;
 		#flush($self);
@@ -444,6 +444,7 @@ my $qemu_params = [
 	['ram', 'qemu_ram', 'Qemu RAM size, defaults to 1.5G'],
 	['smp', 'qemu_smp', 'Qemu CPUs defaults to 2'],
 	['virtfs', 'qemu_virtfs', 'Path to a host folder to mount in the guest (on /mnt)'],
+	['serial', 'qemu_serial', 'Qemu serial port device type, currently only support isa (default) and virtio'],
 	['ro-image', 'qemu_ro_image', 'Path to an image which will be exposed as read only']
 ];
 
@@ -454,18 +455,31 @@ sub qemu_init
 	my $tty_log = "ttyS0-" . getppid();
 	my $ram = "1.5G";
 	my $smp = 2;
+	my $serial = 'isa';
 
 	parse_params(\%backend, "qemu", $qemu_params, @_);
 
 	$ram = $backend{'qemu_ram'} if (defined($backend{'qemu_ram'}));
 	$smp = $backend{'qemu_smp'} if (defined($backend{'qemu_smp'}));
+	$serial = $backend{'qemu_serial'} if (defined($backend{'qemu_serial'}));
 
 	$backend{'transport_fname'} = $transport_fname;
 	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none";
-	$backend{'qemu_params'} .= " -chardev stdio,id=ttyS0,logfile=$tty_log.log -serial chardev:ttyS0";
-	$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
 	$backend{'qemu_params'} .= " -device virtio-rng-pci";
 	$backend{'qemu_system'} = 'x86_64';
+
+	if ($serial eq 'isa') {
+		$backend{'transport_dev'} = 'ttyS1';
+		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log -serial chardev:tty";
+		$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
+	} elsif ($serial eq 'virtio') {
+		$backend{'transport_dev'} = 'vport1p1';
+		$backend{'qemu_params'} .= " -device virtio-serial";
+		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log --device virtconsole,chardev=tty";
+		$backend{'qemu_params'} .= " -device virtserialport,chardev=transport -chardev file,id=transport,path=$transport_fname";
+	} else {
+		die("Unupported serial device type $backend{'qemu_serial'}");
+	}
 
 	die('Qemu image not defined') unless defined($backend{'qemu_image'});
 
