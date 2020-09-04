@@ -26,7 +26,7 @@ use warnings;
 use Time::HiRes qw(clock_gettime CLOCK_MONOTONIC);
 
 use IPC::Open2;
-use POSIX ":sys_wait_h";
+use POSIX qw(:sys_wait_h mkfifo);
 use Fcntl;
 use Errno;
 use IO::Poll qw(POLLIN);
@@ -317,6 +317,19 @@ sub qemu_create_overlay
 	$ret == 0 || die("Failed to create image overlay: $?");
 }
 
+sub qemu_create_transport
+{
+    my ($self) = @_;
+
+    for my $suffix (('.in', '.out')) {
+        my $fname = $self->{'transport_fname'} . $suffix;
+		unlink($fname);
+        msg("Creating pipe $fname");
+		mkfifo($fname, 0666) ||
+            die "Could not create $self->{'transport_fname'}.{in,out}";
+	}
+}
+
 sub qemu_interactive($)
 {
 	my ($self) = @_;
@@ -324,6 +337,8 @@ sub qemu_interactive($)
 
 	msg("Starting qemu with: $cmdline\n");
 	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
+	qemu_create_transport($self);
+
 	exec $cmdline || die("Failed to exec QEMU: $?");
 }
 
@@ -333,10 +348,9 @@ sub qemu_start
 	my $cmdline = qemu_cmdline($self);
 
 	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
+	qemu_create_transport($self);
 
 	msg("Starting qemu with: $cmdline\n");
-
-	unlink($self->{'transport_fname'});
 
 	my ($qemu_out, $qemu_in);
 	my $pid = open2($qemu_out, $qemu_in, $cmdline) or die("Fork failed");
@@ -346,12 +360,12 @@ sub qemu_start
 	$self->{'out_fd'} = $qemu_out;
 
 	for (my $i = 0; $i < 10; $i++) {
-		if (open(my $fh, '<', $self->{'transport_fname'})) {
+		if (open(my $fh, '<', $self->{'transport_fname'} . '.out')) {
 			$self->{'transport'} = $fh;
 			$self->{'read_file'} = \&qemu_read_file;
 			last;
 		}
-		msg("Waiting for '$self->{'transport_fname'}' file to appear\n");
+		msg("Waiting for '$self->{'transport_fname'}.out' file to appear\n");
 		sleep(1);
 	}
 
@@ -471,12 +485,12 @@ sub qemu_init
 	if ($serial eq 'isa') {
 		$backend{'transport_dev'} = 'ttyS1';
 		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log -serial chardev:tty";
-		$backend{'qemu_params'} .= " -serial chardev:transport -chardev file,id=transport,path=$transport_fname";
+		$backend{'qemu_params'} .= " -serial chardev:transport -chardev pipe,id=transport,path=$transport_fname";
 	} elsif ($serial eq 'virtio') {
 		$backend{'transport_dev'} = 'vport1p1';
 		$backend{'qemu_params'} .= " -device virtio-serial";
 		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log --device virtconsole,chardev=tty";
-		$backend{'qemu_params'} .= " -device virtserialport,chardev=transport -chardev file,id=transport,path=$transport_fname";
+		$backend{'qemu_params'} .= " -device virtserialport,chardev=transport -chardev pipe,id=transport,path=$transport_fname";
 	} else {
 		die("Unupported serial device type $backend{'qemu_serial'}");
 	}
