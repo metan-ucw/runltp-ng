@@ -234,6 +234,17 @@ sub stop
 	$self->{'stop'}->($self, $timeout) if defined($self->{'stop'});
 }
 
+sub drive_executor
+{
+	my ($self) = @_;
+
+	if (defined($self->{'drive_executor'})) {
+		$self->{'drive_executor'}->($self);
+	} else {
+		die "Executor not implemented for $self->{'name'}";
+	}
+}
+
 sub serial_relay_force_stop
 {
 	my ($self) = @_;
@@ -371,6 +382,12 @@ sub qemu_start
 
 	die("Can't open transport file") unless defined($self->{'transport'});
 
+	if ($self->{'executor'}) {
+		close($self->{'transport'});
+		$self->{'read_file'} = \&executor_read_file;
+		return;
+	}
+
 	msg("Waiting for qemu to boot the machine\n");
 
 	wait_regexp($self, qr/login:/);
@@ -408,6 +425,31 @@ sub qemu_stop($$)
 
 	kill('TERM', $self->{'pid'});
 	return waitpid($self->{'pid'}, 0) < 0 ? -1 : 0;
+}
+
+sub qemu_stop_executor($$)
+{
+	my ($self, $timeout) = @_;
+
+	msg("Stopping qemu pid $self->{'pid'}\n");
+
+	kill('TERM', $self->{'pid'});
+	my $ret = waitpid($self->{'pid'}, 0) < 0 ? -1 : 0;
+
+    unlink($self->{'transport_fname'} . '.in');
+    unlink($self->{'transport_fname'} . '.out');
+
+    return $ret;
+}
+
+sub qemu_drive_executor
+{
+	my ($self) = @_;
+	my $pipe = $self->{'transport_fname'};
+
+	system("./driver >$pipe.in <$pipe.out");
+	my $err = $? == -1 ? $! : $? & 127 ? $? : $? >> 8;
+	die 'Exec Failed: `driver` -> ' . $err if ($err);
 }
 
 sub print_help
@@ -471,6 +513,7 @@ sub qemu_init
 	my $smp = 2;
 	my $serial = 'isa';
 
+	$backend{executor} = shift();
 	parse_params(\%backend, "qemu", $qemu_params, @_);
 
 	$ram = $backend{'qemu_ram'} if (defined($backend{'qemu_ram'}));
@@ -485,7 +528,7 @@ sub qemu_init
 	if ($serial eq 'isa') {
 		$backend{'transport_dev'} = 'ttyS1';
 		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log -serial chardev:tty";
-		$backend{'qemu_params'} .= " -serial chardev:transport -chardev pipe,id=transport,path=$transport_fname";
+		$backend{'qemu_params'} .= " -serial chardev:transport -chardev pipe,id=transport,path=$transport_fname,logfile=$transport_fname.log";
 	} elsif ($serial eq 'virtio') {
 		$backend{'transport_dev'} = 'vport1p1';
 		$backend{'qemu_params'} .= " -device virtio-serial";
@@ -522,10 +565,11 @@ sub qemu_init
 
 	$backend{'interactive'} = \&qemu_interactive;
 	$backend{'start'} = \&qemu_start;
-	$backend{'stop'} = \&qemu_stop;
-	$backend{'force_stop'} = \&qemu_stop;
+	$backend{'stop'} = $backend{'executor'} ? \&qemu_stop_executor : \&qemu_stop;
+	$backend{'force_stop'} = $backend{'stop'};
 	$backend{'name'} = 'qemu';
 	$backend{'buf'} = '';
+	$backend{'drive_executor'} = \&qemu_drive_executor;
 
 	return \%backend;
 }
@@ -623,6 +667,7 @@ sub ssh_init
 {
 	my %backend;
 
+	msg("WARNING: Executor not implemented on SSH\n") if shift();
 	parse_params(\%backend, "ssh", $ssh_params, @_);
 
 	die("ssh:host must be set!") unless defined($backend{'ssh_host'});
@@ -674,6 +719,7 @@ sub sh_init
 
 	$backend{'shell'} = "/bin/sh";
 
+	msg("WARNING: Executor not implemented on SH\n") if shift();
 	parse_params(\%backend, "sh", $sh_params, @_);
 
 	$backend{'start'} = \&sh_start;
@@ -692,7 +738,7 @@ my @backends = (
 
 sub new
 {
-	my ($opts) = @_;
+	my ($executor, $opts) = @_;
 
 	my @backend_params = quotewords(':', 0, $opts);
 	my $backend_type = shift @backend_params;
@@ -700,7 +746,7 @@ sub new
 	msg("Using $backend_type backend; parameters '@backend_params'\n");
 
 	for (@backends) {
-		return $_->[2]->(@backend_params) if ($_->[0] eq $backend_type);
+		return $_->[2]->($executor, @backend_params) if ($_->[0] eq $backend_type);
 	}
 
 	die("Invalid backend type '$backend_type'\n");

@@ -478,4 +478,36 @@ sub run_ltp
 	return (\%stats, \@results);
 }
 
+sub tstctl
+{
+	my $args = join(' ', @_);
+	my $output = `./tstctl $args`;
+	my $err = $? == -1 ? $! : $? & 127 ? $? : $? >> 8;
+
+	die "Exec Failed: `$args` -> $err" if $err;
+
+	return $output;
+}
+
+sub run_ltp_executor
+{
+	my ($self, $ltpdir, $runtest, $timeout, $include, $exclude) = @_;
+
+	# The local log file for 'cat' will be called $runtest. This
+	# allows us to transfer the contents of the runtes file to the
+	# host
+	tstctl('init');
+	tstctl('add-test', $runtest, 'cat', "$ltpdir/runtest/$runtest");
+	backend::drive_executor($self);
+
+	tstctl('init');
+	tstctl('add-tests', $runtest);
+
+	while (tstctl('status') =~ /TODO/) {
+		backend::drive_executor($self);
+        last if (tstctl('status') =~ /DONE/);
+		reboot($self, "Driver stopped, but more tests todo", $timeout);
+	}
+}
+
 1;

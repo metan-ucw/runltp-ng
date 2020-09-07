@@ -46,6 +46,7 @@ my $setup;
 my $cmd;
 my $m32;
 my $timeout = 334;
+my $executor;
 
 GetOptions(
 	"backend=s" => \$backend_opts,
@@ -64,7 +65,8 @@ GetOptions(
 	"setup" => \$setup,
 	"cmd=s" => \$cmd,
 	"verbose" => \$verbose,
-	"timeout=i" => \$timeout
+	"timeout=i" => \$timeout,
+	"executor" => \$executor
 ) or die("Error in argument parsing!\n");
 
 if ($help) {
@@ -85,6 +87,7 @@ if ($help) {
 	print("--setup            : Attempts to set up the machine (installs packages)\n\n");
 	print("--cmd=cmd          : Execute command\n\n");
 	print("--timeout=seconds  : The number of seconds to wait for an action to complete (default 300)\n\n");
+	print("--executor         : Use the LTP Concurrent Executor\n\n");
 	print("Backend help\n------------\n\n");
 	print("--backend=sh|...[:param=val]...\n\n");
 	backend::help();
@@ -93,7 +96,7 @@ if ($help) {
 
 log::set_verbosity(1) if ($verbose);
 
-my $backend = backend::new($backend_opts);
+my $backend = backend::new($executor, $backend_opts);
 
 sub stop_exit($)
 {
@@ -118,6 +121,16 @@ if ($interactive) {
 
 backend::set_logfile($backend, "$logname.raw");
 backend::start($backend);
+
+if ($executor) {
+	if ($run) {
+		utils::run_ltp_executor($backend, $ltpdir, $run, $timeout, $include, $exclude);
+		stop_exit(0);
+	} else {
+		print("Only action possible under the executor is to run the tests\n");
+		stop_exit(1);
+	}
+}
 
 if ($setup && install_pkg::install_ltp_pkgs($backend, $m32 || $run =~ "syzkaller")) {
 	stop_exit(0);
