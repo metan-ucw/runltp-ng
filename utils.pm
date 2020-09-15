@@ -485,6 +485,7 @@ sub tstctl
 	my $err = $? == -1 ? $! : $? & 127 ? $? : $? >> 8;
 
 	die "Exec Failed: `$args` -> $err" if $err;
+    msg("tstctl $args -> $output\n");
 
 	return $output;
 }
@@ -501,12 +502,20 @@ sub run_ltp_executor
 	backend::drive_executor($self);
 
 	tstctl('init');
-	tstctl('add-tests', $runtest);
+	tstctl('add-tests', "logs/$runtest");
+    tstctl('set TEST_TIMEOUT', $timeout);
+
+    backend::save_snapshot($self);
 
 	while (tstctl('status') =~ /TODO/) {
 		backend::drive_executor($self);
         last if (tstctl('status') =~ /DONE/);
-		reboot($self, "Driver stopped, but more tests todo", $timeout);
+
+        if ($self->{has_snapshot}) {
+            backend::load_snapshot($self);
+        } else {
+            reboot($self, "Driver stopped, but more tests todo", $timeout);
+        }
 	}
 }
 

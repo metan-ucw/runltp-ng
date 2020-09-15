@@ -31,6 +31,7 @@ use Fcntl;
 use Errno;
 use IO::Poll qw(POLLIN);
 use Text::ParseWords;
+use JSON;
 
 use log;
 
@@ -282,18 +283,151 @@ sub reboot($$)
 	return $ret;
 }
 
+sub save_snapshot($)
+{
+	my ($self) = @_;
+
+	$self->{has_snapshot} = $self->{save_snapshot}->($self) if defined $self->{save_snapshot};
+
+	return $self->{has_snapshot} // 0;
+}
+
+sub load_snapshot($)
+{
+	my ($self) = @_;
+
+	die "No snapshot was taken to load" unless $self->{has_snapshot};
+
+	$self->{load_snapshot}->($self);
+}
+
+sub qemu_qmp
+{
+    my ($self, $cmd, $args) = @_;
+    my $infh = $self->{'qmp_in'};
+    my $outfh = $self->{'qmp_out'};
+
+    my $inpt = {execute => $cmd};
+    if (defined $args) {
+        $inpt->{'arguments'} = $args;
+    }
+	my $json = encode_json($inpt) . "\n";
+
+	my $ofh = select $infh;
+	$| = 1;
+	print $json;
+	select $ofh;
+	msg("QMP >> $json");
+
+	my $line;
+	my $resp;
+
+    while (1) {
+        $line = <$outfh>;
+		msg("QMP << $line");
+        $resp = decode_json($line);
+
+        return $resp->{return} if defined $resp->{return};
+		next if defined $resp->{'event'} || defined $resp->{'QMP'};
+
+        die "QMP Error: $line"
+		  unless defined $resp->{error} && $resp->{error}->{desc} =~ /^Expecting capabilities/;
+
+		my $caps_json = '{ "execute": "qmp_capabilities" }' . "\n";
+		msg("QMP >> $caps_json");
+		print $infh $caps_json;
+		$line = <$outfh>;
+		msg("QMP << $line");
+		$resp = decode_json($line);
+
+		die "QMP error: $line" unless defined $resp->{return};
+
+		print $infh $json;
+		msg("QMP >> $json");
+	}
+}
+
+sub qemu_save_snapshot($)
+{
+    my ($self) = @_;
+
+    qemu_qmp($self, 'stop');
+    qemu_qmp($self, 'migrate-set-capabilities', {capabilities => [{capability => 'compress',
+                                                                   state => \1},
+                                                                  {capability => 'events',
+                                                                   state => \0}]});
+    qemu_qmp($self, 'migrate-set-parameters', {'compress-level' => 6,
+                                               'compress-threads' => 4,
+                                               'max-bandwidth' => (~0 >> 1)});
+    qemu_qmp($self, 'blockdev-snapshot-sync', {'node-name' => 'bd0',
+											   'snapshot-node-name' => 'bd1',
+											   'snapshot-file' => 'snapshot-overlay.qcow2',
+											   format => 'qcow2'});
+	qemu_qmp($self, 'migrate', {uri => 'exec:cat - > snapshot.vm'});
+
+	while (1) {
+		my $status = qemu_qmp($self, 'query-migrate')->{status};
+
+		die 'Migration (Snapshot) failed' if $status eq 'failed';
+
+		last if $status eq 'completed';
+
+		sleep(1);
+	}
+
+	# Avoid causing an illegal state transition by waiting for QEMU to go into post-migrate
+	while (1) {
+		my $status = qemu_qmp($self, 'query-status')->{status} // '';
+
+		last unless $status =~ /paused|finish-migrate/;
+
+		sleep(0.1);
+	}
+
+	qemu_qmp($self, 'cont');
+}
+
+sub qemu_load_snapshot($)
+{
+	my ($self) = @_;
+
+	qemu_stop_executor($self);
+	unlink('snapshot-overlay.qcow2');
+	qemu_exec($self, '-incoming defer');
+
+    qemu_qmp($self, 'blockdev-snapshot-sync', {'node-name' => 'bd0',
+											   'snapshot-node-name' => 'bd1',
+											   'snapshot-file' => 'snapshot-overlay.qcow2',
+											   format => 'qcow2'});
+	qemu_qmp($self, 'migrate-set-capabilities', {capabilities => [{capability => 'compress',
+                                                                   state => \1},
+                                                                  {capability => 'events',
+                                                                   state => \0}]});
+    qemu_qmp($self, 'migrate-incoming', {uri => 'exec:cat snapshot.vm'});
+
+	while (1) {
+		my $status = qemu_qmp($self, 'query-status')->{status} // '';
+
+		last unless $status =~ /migrate/;
+
+		sleep(1);
+	}
+
+	qemu_qmp($self, 'cont');
+}
+
 sub qemu_read_file($$)
 {
 	my ($self, $path) = @_;
 	my @lines;
 
 	if (run_cmd($self, "cat \"$path\" > /dev/$self->{'transport_dev'}")) {
-		msg("Failed to write file to $self->{'transport_dev'}");
+		msg("Failed to write file to $self->{'transport_dev'}\n");
 		return @lines;
 	}
 
 	if (run_cmd($self, "echo 'runltp-ng-magic-end-of-file-string' > /dev/$self->{'transport_dev'}")) {
-		msg("Failed to write to $self->{'transport_dev'}");
+		msg("Failed to write to $self->{'transport_dev'}\n");
 		return @lines;
 	}
 
@@ -328,17 +462,31 @@ sub qemu_create_overlay
 	$ret == 0 || die("Failed to create image overlay: $?");
 }
 
-sub qemu_create_transport
+sub qemu_mkfifos($)
+{
+    my ($name) = @_;
+
+    for my $suffix (('.in', '.out')) {
+        my $fname = $name . $suffix;
+		unlink($fname);
+        msg("Creating pipe $fname\n");
+		mkfifo($fname, 0666) ||
+            die "Could not create $fname: $!";
+	}
+}
+
+sub qemu_create_transport($)
 {
     my ($self) = @_;
 
-    for my $suffix (('.in', '.out')) {
-        my $fname = $self->{'transport_fname'} . $suffix;
-		unlink($fname);
-        msg("Creating pipe $fname");
-		mkfifo($fname, 0666) ||
-            die "Could not create $self->{'transport_fname'}.{in,out}";
-	}
+    qemu_mkfifos($self->{'transport_fname'});
+}
+
+sub qemu_create_qmp($)
+{
+    my ($self) = @_;
+
+    qemu_mkfifos($self->{'qmp_fname'});
 }
 
 sub qemu_interactive($)
@@ -349,17 +497,27 @@ sub qemu_interactive($)
 	msg("Starting qemu with: $cmdline\n");
 	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
 	qemu_create_transport($self);
+    qemu_create_qmp($self);
+
+	if (!fork()) {
+		open(my $fh, '>', $self->{qmp_fname} . '.in');
+		print $fh '{ "execute": "qmp_capabilities" }{ "execute": "cont" }';
+		exit(0);
+	}
 
 	exec $cmdline || die("Failed to exec QEMU: $?");
 }
 
-sub qemu_start
+sub qemu_exec
 {
-	my ($self) = @_;
+	my ($self, $extra_cmdline) = @_;
 	my $cmdline = qemu_cmdline($self);
+
+	$cmdline = $cmdline . ' ' . $extra_cmdline if defined $extra_cmdline;
 
 	qemu_create_overlay($self) if (defined($self->{'qemu_image_overlay'}));
 	qemu_create_transport($self);
+    qemu_create_qmp($self);
 
 	msg("Starting qemu with: $cmdline\n");
 
@@ -382,11 +540,23 @@ sub qemu_start
 
 	die("Can't open transport file") unless defined($self->{'transport'});
 
+    open($self->{'qmp_in'}, '>', $self->{'qmp_fname'} . '.in') || die "Couldn't open QMP: $?";
+    open($self->{'qmp_out'}, '<', $self->{'qmp_fname'} . '.out') || die "Couldn't open QMP: $?";
+
 	if ($self->{'executor'}) {
 		close($self->{'transport'});
 		$self->{'read_file'} = \&executor_read_file;
-		return;
 	}
+}
+
+sub qemu_start
+{
+	my ($self) = @_;
+
+	qemu_exec($self);
+	qemu_qmp($self, 'cont');
+
+	return if $self->{executor};
 
 	msg("Waiting for qemu to boot the machine\n");
 
@@ -447,6 +617,7 @@ sub qemu_drive_executor
 	my ($self) = @_;
 	my $pipe = $self->{'transport_fname'};
 
+	msg("Passing control to Executor driver\n");
 	system("./driver >$pipe.in <$pipe.out");
 	my $err = $? == -1 ? $! : $? & 127 ? $? : $? >> 8;
 	die 'Exec Failed: `driver` -> ' . $err if ($err);
@@ -509,6 +680,7 @@ sub qemu_init
 	my %backend;
 	my $transport_fname = "transport-" . getppid();
 	my $tty_log = "ttyS0-" . getppid();
+    my $qmp_fname = "qmp-" . getppid();
 	my $ram = "1.5G";
 	my $smp = 2;
 	my $serial = 'isa';
@@ -521,18 +693,24 @@ sub qemu_init
 	$serial = $backend{'qemu_serial'} if (defined($backend{'qemu_serial'}));
 
 	$backend{'transport_fname'} = $transport_fname;
+    $backend{'qmp_fname'} = $qmp_fname;
 	$backend{'qemu_params'} = "-enable-kvm -m $ram -smp $smp -display none";
 	$backend{'qemu_params'} .= " -device virtio-rng-pci";
 	$backend{'qemu_system'} = 'x86_64';
 
+    $backend{'qemu_params'} .= " -chardev pipe,id=qmp,path=$qmp_fname,logfile=$qmp_fname.log";
+    $backend{'qemu_params'} .= " -qmp chardev:qmp";
+	# Don't start the CPU immediately
+	$backend{'qemu_params'} .= " -S";
+
 	if ($serial eq 'isa') {
 		$backend{'transport_dev'} = 'ttyS1';
-		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log -serial chardev:tty";
+		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log,logappend -serial chardev:tty";
 		$backend{'qemu_params'} .= " -serial chardev:transport -chardev pipe,id=transport,path=$transport_fname,logfile=$transport_fname.log";
 	} elsif ($serial eq 'virtio') {
 		$backend{'transport_dev'} = 'vport1p1';
 		$backend{'qemu_params'} .= " -device virtio-serial";
-		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log --device virtconsole,chardev=tty";
+		$backend{'qemu_params'} .= " -chardev stdio,id=tty,logfile=$tty_log.log,logappend --device virtconsole,chardev=tty";
 		$backend{'qemu_params'} .= " -device virtserialport,chardev=transport -chardev pipe,id=transport,path=$transport_fname";
 	} else {
 		die("Unupported serial device type $backend{'qemu_serial'}");
@@ -545,7 +723,7 @@ sub qemu_init
 		$backend{'qemu_image'} .= '.overlay';
 	}
 
-	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
+	$backend{'qemu_params'} .= ' -drive node-name=bd0,if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
 	if (defined($backend{'qemu_ro_image'})) {
 		$backend{'qemu_params'} .= ' -drive read-only,if=virtio,cache=unsafe,file='
 		    . $backend{'qemu_ro_image'};
@@ -570,6 +748,8 @@ sub qemu_init
 	$backend{'name'} = 'qemu';
 	$backend{'buf'} = '';
 	$backend{'drive_executor'} = \&qemu_drive_executor;
+	$backend{save_snapshot} = \&qemu_save_snapshot;
+	$backend{load_snapshot} = \&qemu_load_snapshot;
 
 	return \%backend;
 }
