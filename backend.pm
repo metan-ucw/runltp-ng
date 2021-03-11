@@ -528,7 +528,11 @@ sub ssh_start
 		sleep(1);
 	}
 
-	my $sshcmd = 'ssh ' . ($key ? "-i $key " : " ") . "$user\@$host";
+	my $sshcmd = 'ssh ';
+	$sshcmd .= ($key ? "-i $key " : " ");
+	$sshcmd .= $self->{'ssh_opts'} . ' ';
+	$sshcmd .= "$user\@$host";
+	$sshcmd =~ s/'/'"'"'/g;
 	my $cmdline = "export TERM=dumb; script -f -c '$sshcmd' /dev/null";
 
 	msg("Starting ssh: $cmdline\n");
@@ -589,8 +593,9 @@ my $ssh_params = [
 	['key_file', 'ssh_key', 'File for public key authentication'],
 	['serial_relay_port', 'serial_relay_port', "Serial relay poor man's reset dongle port"],
 	['reset_command', 'reset_command', 'If SUT hang, given command is '
-			. 'executed to reset. If command exit with error, test gets '
-			. 'stopped otherwise ssh connection will be reinitalized. ']
+	                . 'executed to reset. If command exit with error, test gets '
+	                . 'stopped otherwise ssh connection will be reinitalized. '],
+	['ssh_opts', 'ssh_opts', 'Additional ssh options']
 ];
 
 sub ssh_reset_command
@@ -616,6 +621,7 @@ sub ssh_init
 		unless (defined($backend{'root_password'})
 		|| defined($backend{'ssh_key'}));
 	$backend{'ssh_user'} //= 'root';
+	$backend{'ssh_opts'} //= '';
 
 	$backend{'start'} = \&ssh_start;
 	$backend{'stop'} = \&ssh_stop;
