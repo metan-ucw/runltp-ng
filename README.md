@@ -11,7 +11,7 @@ on a seperate host which controls the SUT.
 Quickstart
 ==========
 
-You can get help with `./runltp --help`.
+You can get help with `./runltp-ng --help`.
 
 QEMU
 ----
@@ -19,15 +19,15 @@ QEMU
 First you need a VM image which boots without user input and starts a serial
 terminal (See Grub section below).
 
-For Debian and SUSE atleast you may automatically install LTP by doing
+For Debian and SUSE at least you may automatically install LTP by doing
 something like the following.
 
 ```
-$ ./runltp --verbose --setup --install=mybranch --repouri=/mnt/ltp\
+$ ./runltp-ng --verbose --setup --install=mybranch --repouri=/mnt/ltp\
            --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/local:password=123\
 ```
 
-This assums you have a local checkout of the LTP at `/local/ltp` with a branch
+This assumes you have a local checkout of the LTP at `/local/ltp` with a branch
 `mybranch`. The `virtfs` backend option will cause `/local` to be mounted on
 the virtual machine at `/mnt` (as read-only).
 
@@ -47,7 +47,7 @@ If you want the OpenPOSIX test suite or the Syzkaller reproducers to be
 installed then you could do something like.
 
 ```
-$ ./runltp --run=syzkaller --install=master\
+$ ./runltp-ng --run=syzkaller --install=master\
            --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:password=123\
 ```
 
@@ -56,7 +56,7 @@ exists. To run the tests:
 
 ```
 $ ./runltp-ng --run=syzkaller1 --timeout=20\
-              --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:password=123:image-overlay=1 
+              --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:password=123:image-overlay=1
 ```
 
 This will run the tests with an overall timeout of 20 seconds (usually it is
@@ -68,7 +68,7 @@ Sometimes you can skip installation altogether and just run tests from your
 host machine.
 
 ```
-$ ./runltp --run=syscalls --ltpdir=/mnt\
+$ ./runltp-ng --run=syscalls --ltpdir=/mnt\
            --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/opt/ltp:password=123
 ```
 
@@ -79,7 +79,7 @@ linking).
 You can also run a single command.
 
 ```
-$ ./runltp --cmd=/mnt/testcases/kernel/systemcalls/bpf/bpf_prog02\
+$ ./runltp-ng --cmd=/mnt/testcases/kernel/systemcalls/bpf/bpf_prog02\
            --backend=qemu:ram=4G:smp=4:image=/local/vm.qcow2:virtfs=/home/me/ltp:password=123
 ```
 
@@ -108,7 +108,7 @@ test execution framework with something that meets this requirement as it
 became more and more clear that rebooting the machine manually and disabling
 tests does not scale. It became more of a burden as we started to implement
 more and more kernel regression tests and it became less and less likely that
-the machine will outlive the actuall testrun.
+the machine will outlive the actual testrun.
 
 The second but still important reason for a new testrunner is to implement a
 continuous integration (CI) for the LTP testsuite itself. The LTP release
@@ -150,7 +150,7 @@ continue with the testrun.
 Detecting kernel corruptions is a tricky problem since once that happens all
 bets are off and we enter the land of undefined behavior. Sometimes the problem
 manifests too late to be easily connected to the test that triggered it as
-well. Hoewever happily for us the recent kernels are quite good in detecting
+well. However happily for us the recent kernels are quite good in detecting
 various unexpected conditions and they produce a trace and set the tainted
 flags, at least that seems to be the case for most of our regression tests.
 Hence checking the taint flags after a failed testcase should, most of the
