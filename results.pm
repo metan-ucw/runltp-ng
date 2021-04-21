@@ -2,7 +2,7 @@
 #
 # Linux Test Project test runner
 #
-# Copyright (c) 2017-2018 Cyril Hrubis <chrubis@suse.cz>
+# Copyright (c) 2017-2021 Cyril Hrubis <chrubis@suse.cz>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,6 +29,10 @@ sub json_print_string
 
 	$str =~ s/\\/\\\\/g;
 	$str =~ s/"/\\"/g;
+	$str =~ s/\r/\\r/g;
+	$str =~ s/\n/\\n/g;
+	$str =~ s/\f/\\f/g;
+	$str =~ s/\t/\\t/g;
 	$str =~ s/[^[:print:]]//g;
 
 	print($fh '"' . $str . '"');
@@ -437,6 +441,51 @@ sub writelog
 	writelog_json($log, $fh);
 
 	close($fh);
+}
+
+sub json_filter
+{
+	my ($filter, $logs) = @_;
+	my $filters = {
+		'openqa' => \&openqa_filter
+	};
+
+	return $logs unless ($filter);
+
+	warn "WARN: $filter is not supported. Logs are not going to change" unless $filters->{$filter};
+
+	return $filters->{$filter}->($logs);
+}
+
+sub openqa_filter
+{
+	my ($log_data) = @_;
+	my $json_data = {
+		'environment' => $log_data->{sysinfo},
+		'stats' => $log_data->{tests}->{stats},
+		'results' => []
+	};
+
+	for my $r (@{$log_data->{tests}->{results}}) {
+		my $result = 'unk';
+
+		$result = 'pass' if ($r->{passed} || $r->{skipped});
+		$result = 'fail' if ($r->{failed} || $r->{broken} || $r->{warnings});
+
+		my $t = {
+			'test_fqn' => $r->{tid},
+			'status' => $result,
+			'test' => {
+				'duration' => $r->{runtime},
+				'result' => $result,
+				'log' => join($/, @{$r->{log}})
+			}
+		};
+
+		push(@{$json_data->{results}}, $t);
+	}
+
+	return $json_data;
 }
 
 1;
