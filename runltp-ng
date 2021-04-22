@@ -141,8 +141,8 @@ if ($run) {
 	my %results;
 	$results{'sysinfo'} = utils::collect_sysinfo($backend);
 	my ($stats, $test_results) =
-	    utils::run_ltp($backend, $ltpdir, $run, $timeout,
-			   $include, $exclude);
+		utils::run_ltp($backend, $ltpdir, $run, $timeout,
+		$include, $exclude);
 	$results{'tests'} = {'stats' => $stats, 'results' => $test_results};
 	results::writelog(\%results, "$logname.json");
 	results::writelog_html(\%results, "$logname.html");
