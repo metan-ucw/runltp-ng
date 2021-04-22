@@ -311,8 +311,8 @@ sub qemu_create_overlay
 	my ($self) = @_;
 
 	my $ret = system('qemu-img', 'create', '-f', 'qcow2',
-			 '-b', $self->{'qemu_image_backing'},
-			 $self->{'qemu_image'});
+		'-b', $self->{'qemu_image_backing'},
+		$self->{'qemu_image'});
 
 	$ret == 0 || die("Failed to create image overlay: $?");
 }
@@ -491,7 +491,7 @@ sub qemu_init
 	$backend{'qemu_params'} .= ' -drive if=virtio,cache=unsafe,file=' . $backend{'qemu_image'};
 	if (defined($backend{'qemu_ro_image'})) {
 		$backend{'qemu_params'} .= ' -drive read-only,if=virtio,cache=unsafe,file='
-		    . $backend{'qemu_ro_image'};
+			. $backend{'qemu_ro_image'};
 	}
 
 	if (defined($backend{'qemu_opts'})) {
@@ -593,8 +593,8 @@ my $ssh_params = [
 	['key_file', 'ssh_key', 'File for public key authentication'],
 	['serial_relay_port', 'serial_relay_port', "Serial relay poor man's reset dongle port"],
 	['reset_command', 'reset_command', 'If SUT hang, given command is '
-	                . 'executed to reset. If command exit with error, test gets '
-	                . 'stopped otherwise ssh connection will be reinitalized. '],
+			. 'executed to reset. If command exit with error, test gets '
+			. 'stopped otherwise ssh connection will be reinitalized. '],
 	['ssh_opts', 'ssh_opts', 'Additional ssh options']
 ];
 
