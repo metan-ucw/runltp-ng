@@ -42,6 +42,7 @@ sub foo_to_pkg
 		'e2fsprogs' => 'e2fsprogs',
 		'btrfsprogs' => 'btrfsprogs',
 		'btrfsprogs-debian' => 'btrfs-progs',
+		'btrfsprogs-fedora' => 'btrfs-progs',
 
 		# FS quota tools
 		'quota' => 'quota',
@@ -60,6 +61,12 @@ sub foo_to_pkg
 		'libattr-devel-debian' => 'libattr1-dev',
 		'libcap-devel-debian' => 'libcap-dev',
 		'libnuma-devel-debian' => 'libnuma-dev',
+
+		'libaio-devel-fedora' => 'libaio-devel',
+		'libacl-devel-fedora' => 'libacl-devel',
+		'libattr-devel-fedora' => 'libattr-devel',
+		'libcap-devel-fedora' => 'libcap-devel',
+		'libnuma-devel-fedora' => 'numactl-devel',
 
 		'libaio-devel-suse' => 'libaio-devel',
 		'libacl-devel-suse' => 'libacl-devel',
@@ -80,6 +87,9 @@ sub detect_distro
 
 	if (utils::run_cmd_retry($self, 'grep -q debian /etc/os-release') == 0) {
 		return "debian";
+	}
+	if (utils::run_cmd_retry($self, 'grep -q fedora /etc/os-release') == 0) {
+		return "fedora";
 	}
 	if (utils::run_cmd_retry($self, 'grep -q suse /etc/os-release') == 0) {
 		return "suse";
@@ -126,12 +136,14 @@ sub install_pkg
 	if ($distro eq 'debian') {
 		return 'apt-get install -y ' . join(' ', @pkgs);
 
+	} elsif ($distro eq 'fedora') {
+		return 'yum install -y ' . join(' ', @pkgs);
+
 	} elsif ($distro eq 'suse') {
 		return 'zypper --non-interactive --ignore-unknown in ' . join(' ', @pkgs);
 	}
 	return;
 }
-
 
 sub update_pkg_db
 {
@@ -139,6 +151,10 @@ sub update_pkg_db
 
 	if ($distro eq "debian") {
 		return "apt-get update";
+	}
+
+	if ($distro eq "fedora") {
+		return "yum update -y";
 	}
 
 	if ($distro eq "suse") {
