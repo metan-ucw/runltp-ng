@@ -425,7 +425,7 @@ sub run_ltp
 		chomp;
 
 		my ($tid, $c) = parse_test($runtest, $_);
-		next unless ($tid =~ $include);
+		next unless (!$include || $include =~ $tid);
 		next if ($exclude && $exclude =~ $tid);
 
 		print("Executing $tid\n");
