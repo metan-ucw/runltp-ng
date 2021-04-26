@@ -426,7 +426,7 @@ sub run_ltp
 
 		my ($tid, $c) = parse_test($runtest, $_);
 		next unless ($tid =~ $include);
-		next if ($exclude && $tid =~ $exclude);
+		next if ($exclude && $exclude =~ $tid);
 
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
