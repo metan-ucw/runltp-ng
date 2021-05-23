@@ -1,9 +1,8 @@
 #!/usr/bin/perl
-#
-# Copyright (c) 2017-2019 Cyril Hrubis <chrubis@suse.cz>
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (c) 2017-2021 Cyril Hrubis <chrubis@suse.cz>
 #
 # Compares two json formatted result files
-#
 
 use strict;
 use warnings;
