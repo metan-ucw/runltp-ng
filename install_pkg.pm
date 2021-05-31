@@ -34,7 +34,27 @@ sub foo_to_pkg
 		'pkg-config' => 'pkg-config',
 		'make' => 'make',
 		'gcc' => 'gcc',
+		'bc' => 'bc',
 
+		# mkfs.foo
+		'dosfstools' => 'dosfstools',
+		'xfsprogs' => 'xfsprogs',
+		'e2fsprogs' => 'e2fsprogs',
+		'btrfsprogs' => 'btrfsprogs',
+		'btrfsprogs-debian' => 'btrfs-progs',
+
+		# FS quota tools
+		'quota' => 'quota',
+
+		# NFS tools
+		'nfs-utils' => 'nfs-utils',
+		'nfs-utils-debian' => 'nfs-kernel-server',
+
+		# kernel devel
+		'kernel-devel' => 'kernel-devel',
+		'kernel-devel-debian' => 'linux-headers-`uname -r`',
+
+		# devel libs
 		'libaio-devel-debian' => 'libaio-dev',
 		'libacl-devel-debian' => 'libacl1-dev',
 		'libattr-devel-debian' => 'libattr1-dev',
@@ -136,7 +156,7 @@ sub install_ltp_pkgs
 	return unless defined($distro);
 
 	# Attempt to install required packages
-	my @required_pkgs = ('make', 'autoconf', 'automake', 'pkg-config', 'gcc');
+	my @required_pkgs = ('make', 'autoconf', 'automake', 'pkg-config', 'gcc', 'bc');
 
 	# We need at least one
 	push(@required_pkgs, 'git');
@@ -150,6 +170,24 @@ sub install_ltp_pkgs
 		'libcap-devel',
 		'libnuma-devel');
 	push(@required_pkgs, @devel_libs);
+
+	# We need mkfs.foo at runtime
+	my @mkfs = (
+		'dosfstools',
+		'xfsprogs',
+		'e2fsprogs',
+		'btrfsprogs',
+	);
+	push(@required_pkgs, @mkfs);
+
+	# FS quota tests needs quota tools
+	push(@required_pkgs, ('quota'));
+
+	# NFS tests needs exportfs
+	push(@required_pkgs, ('nfs-utils'));
+
+	# Kernel devel so that we can build modules
+	push(@required_pkgs, ('kernel-devel'));
 
 	my @cmds = ();
 	push(@cmds, update_pkg_db($distro));
