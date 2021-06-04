@@ -1,0 +1,90 @@
+name: "distros"
+on: [push, pull_request]
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        container: ["alpine:latest", "debian:testing", "debian:stable", "debian:oldstable", "fedora:latest", "opensuse/tumbleweed", "opensuse/leap", "ubuntu:groovy", "ubuntu:xenial"]
+        env: [ARGS: "--m32", ARGS: ""]
+
+        exclude:
+          # 32bit is only via chroot
+          - container: "alpine:latest"
+            env:
+              ARGS: "--m32"
+
+          - container: "fedora:latest"
+            env:
+              ARGS: "--m32"
+
+          # oldstable does not support installing both 32bit and 64bit
+          - container: "debian:oldstable"
+            env:
+              ARGS: "--m32"
+
+    container:
+      image: ${{ matrix.container }}
+      env: ${{ matrix.env }}
+
+    steps:
+    - name: Show OS
+      run: |
+        cat /etc/os-release
+        uname -r
+
+    - name: Install perl
+      run: |
+        DISTRO=${{ matrix.container }}; DISTRO="${DISTRO%%:*}"; DISTRO="${DISTRO%%/*}"
+        case "$DISTRO" in
+          alpine) cmd="apk add";;
+          debian|ubuntu) apt update && cmd="apt install -y --no-install-recommends";;
+          fedora) cmd="dnf -y install";;
+          opensuse) cmd="zypper --non-interactive in";;
+          *) echo "unsupported distro"; exit 1;;
+        esac
+        $cmd perl
+
+    - name: List installed packages (before)
+      run: |
+        DISTRO=${{ matrix.container }}; DISTRO="${DISTRO%%:*}"; DISTRO="${DISTRO%%/*}"
+        case "$DISTRO" in
+          alpine) PKG="apk list";;
+          debian|ubuntu) PKG="apt list --installed";;
+          fedora|opensuse) PKG="rpm -qa";;
+          *) echo "unsupported distro"; exit 1;;
+        esac
+        $PKG | sort
+
+    - name: Git checkout
+      uses: actions/checkout@v1
+
+    - name: runltp-ng --help
+      run: ./runltp-ng --help
+
+    - name: Print installed packages
+      run: |
+        DISTRO=${{ matrix.container }}; DISTRO="${DISTRO%%:*}"; DISTRO="${DISTRO%%/*}"
+        ./install_pkg.pm --build --run --distro $DISTRO $ARGS
+
+    - name: Install packages
+      run: |
+        DISTRO=${{ matrix.container }}; DISTRO="${DISTRO%%:*}"; DISTRO="${DISTRO%%/*}"
+        cmd="./install_pkg.pm --build --run --distro $DISTRO $ARGS --cmd"
+        echo "$cmd"
+        echo "$($cmd)"
+        eval "$($cmd)"
+
+    - name: List installed packages (after)
+      run: |
+        DISTRO=${{ matrix.container }}; DISTRO="${DISTRO%%:*}"; DISTRO="${DISTRO%%/*}"
+        case "$DISTRO" in
+          alpine) PKG="apk list";;
+          debian|ubuntu) PKG="apt list --installed";;
+          fedora|opensuse) PKG="rpm -qa";;
+          *) echo "unsupported distro"; exit 1;;
+        esac
+        $PKG | sort
