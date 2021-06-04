@@ -42,6 +42,12 @@ sub foo_to_pkg
 		'kernel-devel-debian' => 'linux-headers-`uname -r`',
 
 		# devel libs
+		'libaio-devel-alpine' => 'libaio-devel',
+		'libacl-devel-alpine' => 'libacl-devel',
+		'libattr-devel-alpine' => 'libattr-devel',
+		'libcap-devel-alpine' => 'libcap-devel',
+		'libnuma-devel-alpine' => 'numactl-devel',
+
 		'libaio-devel-debian' => 'libaio-dev',
 		'libacl-devel-debian' => 'libacl1-dev',
 		'libattr-devel-debian' => 'libattr1-dev',
@@ -71,14 +77,10 @@ sub detect_distro
 {
 	my ($self) = @_;
 
-	if (utils::run_cmd_retry($self, 'grep -q debian /etc/os-release') == 0) {
-		return "debian";
-	}
-	if (utils::run_cmd_retry($self, 'grep -q fedora /etc/os-release') == 0) {
-		return "fedora";
-	}
-	if (utils::run_cmd_retry($self, 'grep -q suse /etc/os-release') == 0) {
-		return "suse";
+	for my $distro (qw(alpine debian fedora suse)) {
+		if (utils::run_cmd_retry($self, "grep -q $distro /etc/os-release") == 0) {
+			return $distro;
+		}
 	}
 
 	print("Unknown distribution!\n");
