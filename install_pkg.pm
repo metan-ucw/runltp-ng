@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 # SPDX-License-Identifier: GPL-2.0-or-later
 # Copyright (c) 2017-2021 Cyril Hrubis <chrubis@suse.cz>
+# Copyright (c) 2021 Petr Vorel <pvorel@suse.cz>
 #
 # Linux Test Project test runner
 
@@ -130,11 +131,19 @@ sub install_pkg
 {
 	my ($distro, $pkgs) = @_;
 
+	if ($distro eq "alpine") {
+		return 'apk add ' . join(' ', @$pkgs);
+	}
+
 	if ($distro eq 'debian') {
 		return 'apt-get install -y ' . join(' ', @$pkgs);
-	} elsif ($distro eq 'fedora') {
+	}
+
+	if ($distro eq 'fedora') {
 		return 'yum install -y ' . join(' ', @$pkgs);
-	} elsif ($distro eq 'suse') {
+	}
+
+	if ($distro eq 'suse') {
 		return 'zypper --non-interactive --ignore-unknown in ' . join(' ', @$pkgs);
 	}
 }
@@ -142,6 +151,10 @@ sub install_pkg
 sub update_pkg_db
 {
 	my ($distro) = @_;
+
+	if ($distro eq "alpine") {
+		return "apk update";
+	}
 
 	if ($distro eq "debian") {
 		return "apt-get update";
