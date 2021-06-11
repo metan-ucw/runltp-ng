@@ -15,9 +15,3 @@ all: check
 check:
 	$(foreach file, $(perl_src), $(call check_perl_file, $(file)))
 
-.PHONY: tags
-tags:
-	ctags -f tags --recurse --totals --extras=+q \
-	    --languages=Perl --langmap=Perl:+.t \
-	    $(perl_src)
-
