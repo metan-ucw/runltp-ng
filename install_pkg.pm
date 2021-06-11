@@ -28,11 +28,13 @@ sub foo_to_pkg
 		'xfsprogs' => 'xfsprogs',
 		'e2fsprogs' => 'e2fsprogs',
 		'btrfsprogs' => 'btrfsprogs',
+		'btrfsprogs-alpine' => 'btrfs-progs',
 		'btrfsprogs-debian' => 'btrfs-progs',
 		'btrfsprogs-fedora' => 'btrfs-progs',
 
 		# FS quota tools
 		'quota' => 'quota',
+		'quota-alpine' => 'quota-tools',
 
 		# NFS tools
 		'nfs-utils' => 'nfs-utils',
@@ -40,14 +42,16 @@ sub foo_to_pkg
 
 		# kernel devel
 		'kernel-devel' => 'kernel-devel',
+		'kernel-devel-alpine' => 'linux-headers',
 		'kernel-devel-debian' => 'linux-headers-`uname -r`',
 
 		# devel libs
-		'libaio-devel-alpine' => 'libaio-devel',
-		'libacl-devel-alpine' => 'libacl-devel',
-		'libattr-devel-alpine' => 'libattr-devel',
-		'libcap-devel-alpine' => 'libcap-devel',
-		'libnuma-devel-alpine' => 'numactl-devel',
+		'libacl-devel-alpine' => 'acl-dev',
+		'libaio-devel-alpine' => 'libaio-dev',
+		'libattr-devel-alpine' => 'attr-dev',
+		'libcap-devel-alpine' => 'libcap-dev',
+		'libnuma-devel-alpine' => 'numactl-dev',
+		'pkg-config-alpine' => 'pkgconf',
 
 		'libaio-devel-debian' => 'libaio-dev',
 		'libacl-devel-debian' => 'libacl1-dev',
