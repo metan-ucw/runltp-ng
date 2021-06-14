@@ -411,8 +411,8 @@ sub run_ltp
 		chomp;
 
 		my ($tid, $c) = parse_test($runtest, $_);
-		next unless (!$include || $include =~ $tid);
-		next if ($exclude && $exclude =~ $tid);
+		next unless (!$include || ($include =~ $tid || $tid =~ $include));
+		next if ($exclude && ($exclude =~ $tid || $tid =~ $exclude));
 
 		print("Executing $tid\n");
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
