@@ -13,6 +13,7 @@ use warnings;
 sub foo_to_pkg
 {
 	my ($foo, $distro) = @_;
+
 	my %pkg_map = (
 		'git' => 'git',
 		'unzip' => 'unzip',
@@ -65,12 +66,16 @@ sub foo_to_pkg
 		'libcap-devel-fedora' => 'libcap-devel',
 		'libnuma-devel-fedora' => 'numactl-devel',
 
-		'libaio-devel-suse' => 'libaio-devel',
-		'libacl-devel-suse' => 'libacl-devel',
-		'libattr-devel-suse' => 'libattr-devel',
-		'libcap-devel-suse' => 'libcap-devel',
-		'libnuma-devel-suse' => 'libnuma-devel',
+		'libaio-devel-opensuse' => 'libaio-devel',
+		'libacl-devel-opensuse' => 'libacl-devel',
+		'libattr-devel-opensuse' => 'libattr-devel',
+		'libcap-devel-opensuse' => 'libcap-devel',
+		'libnuma-devel-opensuse' => 'libnuma-devel',
 	);
+
+	if ($distro eq 'sles') {
+		$distro = 'opensuse';
+	}
 
 	my $pkg = $pkg_map{"$foo-$distro"};
 	return $pkg if defined $pkg;
@@ -78,7 +83,7 @@ sub foo_to_pkg
 	return $pkg_map{"$foo"};
 }
 
-my @distros = qw(alpine debian fedora suse);
+my @distros = qw(alpine debian fedora opensuse sles);
 
 sub detect_distro
 {
