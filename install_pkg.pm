@@ -110,6 +110,7 @@ sub pkg_to_m32
 
 	if ($distro eq "debian") {
 		#TODO: we need architecture detection for now default to i386
+		return "gcc-multilib" if ($pkg_name eq "gcc");
 		return "$pkg_name:i386";
 	}
 
