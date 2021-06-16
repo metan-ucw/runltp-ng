@@ -77,13 +77,17 @@ sub foo_to_pkg
 		$distro = 'opensuse';
 	}
 
+	if ($distro eq 'ubuntu') {
+		$distro = 'debian';
+	}
+
 	my $pkg = $pkg_map{"$foo-$distro"};
 	return $pkg if defined $pkg;
 
 	return $pkg_map{"$foo"};
 }
 
-my @distros = qw(alpine debian fedora opensuse sles);
+my @distros = qw(alpine debian fedora opensuse sles ubuntu);
 
 sub detect_distro
 {
