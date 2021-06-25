@@ -446,7 +446,7 @@ sub run_ltp
 
 		my $err_msg = 'Machine stopped respoding';
 		if (defined($ret)) {
-			next if ($ret == 0);
+			next if ($ret == 0 || $ret == 32);
 
 			my $tainted = check_tainted($self);
 			next if ($tainted == $start_tainted);
