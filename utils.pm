@@ -430,11 +430,13 @@ sub run_ltp
 			$result = {%empty_result};
 			$result->{'tid'} = $tid;
 			$result->{'log'} = [];
+			$result->{'retval'} = [];
 		}
 
 		push(@{$result->{'log'}}, @log);
 		$result->{'runtime'} += $test_end_time - $test_start_time;
 		$result->{'runs'} += 1;
+		push @{$result->{'retval'}}, (defined($ret) ? $ret : 'undefined');
 
 		if ($runtest =~ "openposix") {
 			parse_retval_openposix($result, \%stats, $ret);
