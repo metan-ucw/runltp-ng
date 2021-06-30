@@ -414,7 +414,10 @@ sub run_ltp
 		next unless (!$include || ($include =~ $tid || $tid =~ $include));
 		next if ($exclude && ($exclude =~ $tid || $tid =~ $exclude));
 
-		print("Executing $tid\n");
+		my $msg = "Executing $tid";
+		print("$msg\n");
+		backend::run_cmd($self, "echo 'runltp-ng: $msg' > /dev/kmsg");
+
 		my $test_start_time = clock_gettime(CLOCK_MONOTONIC);
 		my ($ret, @log) = backend::run_cmd($self, "$c", $timeout);
 		my $test_end_time = clock_gettime(CLOCK_MONOTONIC);
