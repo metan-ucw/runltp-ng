@@ -464,7 +464,8 @@ sub openqa_filter
 			'test' => {
 				'duration' => $r->{runtime},
 				'result' => $result,
-				'log' => join($/, @{$r->{log}})
+				'log' => join($/, @{$r->{log}}),
+				'retval' => $r->{retval}
 			}
 		};
 
