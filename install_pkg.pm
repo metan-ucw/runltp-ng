@@ -121,6 +121,7 @@ sub detect_distro
 sub pkg_to_m32
 {
 	my ($distro, $pkg_name) = @_;
+	$distro = get_distro_alias($distro);
 
 	if ($distro eq "debian") {
 		#TODO: we need architecture detection for now default to i386
@@ -128,7 +129,7 @@ sub pkg_to_m32
 		return "$pkg_name:i386";
 	}
 
-	return "$pkg_name-32bit" if ($distro eq "suse");
+	return "$pkg_name-32bit" if ($distro eq "opensuse");
 
 	return;
 }
@@ -136,10 +137,12 @@ sub pkg_to_m32
 sub setup_m32
 {
 	my ($distro) = @_;
+	$distro = get_distro_alias($distro);
 
 	if ($distro eq "debian") {
 		return ("dpkg --add-architecture i386");
 	}
+
 	return;
 }
 
@@ -159,6 +162,7 @@ sub map_pkgs
 sub install_pkg
 {
 	my ($distro, $pkgs) = @_;
+	$distro = get_distro_alias($distro);
 
 	if ($distro eq "alpine") {
 		return 'apk add ' . join(' ', @$pkgs);
@@ -172,7 +176,7 @@ sub install_pkg
 		return 'yum install -y ' . join(' ', @$pkgs);
 	}
 
-	if ($distro eq 'suse') {
+	if ($distro eq 'opensuse') {
 		return 'zypper --non-interactive --ignore-unknown in ' . join(' ', @$pkgs);
 	}
 }
@@ -180,6 +184,7 @@ sub install_pkg
 sub update_pkg_db
 {
 	my ($distro) = @_;
+	$distro = get_distro_alias($distro);
 
 	if ($distro eq "alpine") {
 		return "apk update";
@@ -193,7 +198,7 @@ sub update_pkg_db
 		return "yum update -y";
 	}
 
-	if ($distro eq "suse") {
+	if ($distro eq "opensuse") {
 		return "zypper --non-interactive ref";
 	}
 
