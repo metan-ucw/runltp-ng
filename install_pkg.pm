@@ -76,6 +76,21 @@ sub foo_to_pkg
 		'libnuma-devel-opensuse' => 'libnuma-devel',
 	);
 
+	my $pkg;
+
+	$pkg = $pkg_map{"$foo-$distro"};
+	return $pkg if defined $pkg;
+
+	$pkg = $pkg_map{"$foo-" . get_distro_alias($distro)};
+	return $pkg if defined $pkg;
+
+	return $pkg_map{"$foo"};
+}
+
+sub get_distro_alias
+{
+	my ($distro) = @_;
+
 	if ($distro eq 'sles') {
 		$distro = 'opensuse';
 	}
@@ -84,10 +99,7 @@ sub foo_to_pkg
 		$distro = 'debian';
 	}
 
-	my $pkg = $pkg_map{"$foo-$distro"};
-	return $pkg if defined $pkg;
-
-	return $pkg_map{"$foo"};
+	return $distro;
 }
 
 my @distros = qw(alpine debian fedora opensuse sles ubuntu);
