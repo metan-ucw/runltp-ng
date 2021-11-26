@@ -46,6 +46,8 @@ sub foo_to_pkg
 		'kernel-devel-alpine' => 'linux-headers',
 		'kernel-devel-debian' =>
 			'linux-headers-`dpkg --print-architecture`',
+		'kernel-devel-ubuntu' =>
+			'linux-headers-`uname -r`',
 
 		# devel libs
 		'libacl-devel-alpine' => 'acl-dev',
