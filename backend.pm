@@ -655,7 +655,7 @@ sub sh_init
 	parse_params(\%backend, "sh", $sh_params, @_);
 
 	$backend{'start'} = \&sh_start;
-	$backend{'stop'} = \&ssh_stop;
+	$backend{'stop'} = \&sh_stop;
 	$backend{'name'} = 'sh';
 	$backend{'buf'} = '';
 
