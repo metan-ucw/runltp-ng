@@ -1,3 +1,9 @@
+Deprecation Warning
+===================
+
+A [Python rewrite](https://github.com/acerv/runltp-ng) is currently in development. 
+Most likely that will replace this Perl version.
+
 Runltp-ng
 =========
 
